@@ -32,35 +32,35 @@ const landingFeatures = [
         description: 'landing_feature1_desc',
         Icon: ThermometerIcon,
         action: 'onWeatherClick',
-        image: 'https://images.unsplash.com/photo-1590112328822-261f9543e129?q=80&w=2535&auto=format&fit=crop'
+        image: 'https://images.unsplash.com/photo-1592210633464-a7db0966ee96?auto=format&fit=crop&q=80&w=2000'
     },
     {
         title: 'landing_feature2_title',
         description: 'landing_feature2_desc',
         Icon: LayersIcon,
         action: 'onSoilAnalysisClick',
-        image: 'https://images.unsplash.com/photo-1591194661549-07d0d183c13d?q=80&w=2670&auto=format&fit=crop'
+        image: 'https://images.unsplash.com/photo-1592982537447-6f2a6a0c3c1b?auto=format&fit=crop&q=80&w=2000'
     },
     {
         title: 'landing_feature3_title',
         description: 'landing_feature3_desc',
         Icon: SparklesIcon,
         action: 'onAssistantClick',
-        image: 'https://images.unsplash.com/photo-1677756119517-756a188d2d94?q=80&w=2670&auto=format&fit=crop'
+        image: 'https://images.unsplash.com/photo-1531746790731-6c087fecd05a?auto=format&fit=crop&q=80&w=2000'
     },
     {
         title: 'landing_feature4_title',
         description: 'landing_feature4_desc',
         Icon: BugIcon,
         action: 'onPlantAnalysisClick',
-        image: 'https://images.unsplash.com/photo-1628791039322-1e79b76a6b10?q=80&w=2574&auto=format&fit=crop'
+        image: 'https://images.unsplash.com/photo-1596733430284-f7437764b1a9?auto=format&fit=crop&q=80&w=2000'
     },
     {
         title: 'landing_feature5_title',
         description: 'landing_feature5_desc',
         Icon: BuildingIcon,
         action: 'onMarketplaceClick',
-        image: 'https://images.unsplash.com/photo-1612676532892-3c24a2d8af14?q=80&w=2670&auto=format&fit=crop'
+        image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=2000'
     }
 ];
 
