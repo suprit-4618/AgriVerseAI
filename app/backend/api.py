@@ -16,6 +16,7 @@ import traceback
 import logging
 import sys
 import asyncio
+import os
 
 # JWT Authentication
 from jwt_auth import get_current_user, get_optional_user, TokenData
@@ -134,9 +135,20 @@ app = FastAPI(
 )
 
 # CORS middleware
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://agriverse-ai.vercel.app", # Default production URL
+]
+
+# Add dynamic frontend URL if provided
+frontend_url = os.environ.get("FRONTEND_URL")
+if frontend_url and frontend_url not in origins:
+    origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

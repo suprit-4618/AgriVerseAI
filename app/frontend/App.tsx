@@ -118,17 +118,9 @@ const App: React.FC = () => {
             setShowProfileCreation(true);
             setIsAppLoading(false);
         } else {
-            setIsAppLoading(true);
-            setTimeout(() => {
-                setIsAppLoading(false);
-                if (user.role === UserRole.ADMIN) {
-                    setCurrentPage('admin_dashboard');
-                } else if (user.role === UserRole.BUYER) {
-                    setCurrentPage('buyer_dashboard');
-                } else {
-                    setCurrentPage('home');
-                }
-            }, 2000);
+            // No need for redundant setTimeout here, 
+            // the onAuthStateChanged listener already handles the redirect instantly.
+            setIsAppLoading(false);
         }
     };
 

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: agriverse-api
+    env: python
+    buildCommand: pip install -r app/backend/requirements.txt
+    startCommand: cd app/backend && uvicorn api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+      - key: PORT
+        value: 8000
+      - key: FRONTEND_URL
+        value: https://agriverse-ai.vercel.app # Placeholder, user will update in Render dashboard
+      - key: SUPABASE_URL
+        value: "" # Removed but kept for env logic
+      - key: SUPABASE_KEY
+        value: "" # Removed but kept for env logic
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false # Set in dashboard
