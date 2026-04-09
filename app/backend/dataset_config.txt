@@ -1,0 +1,5 @@
+DATASET_PATH=C:\Users\Kiran Nandani\.cache\kagglehub\datasets\vipoooool\new-plant-diseases-dataset\versions\2
+TRAIN_DIR=C:\Users\Kiran Nandani\.cache\kagglehub\datasets\vipoooool\new-plant-diseases-dataset\versions\2\New Plant Diseases Dataset(Augmented)\New Plant Diseases Dataset(Augmented)\train
+VALID_DIR=C:\Users\Kiran Nandani\.cache\kagglehub\datasets\vipoooool\new-plant-diseases-dataset\versions\2\New Plant Diseases Dataset(Augmented)\New Plant Diseases Dataset(Augmented)\valid
+TEST_DIR=C:\Users\Kiran Nandani\.cache\kagglehub\datasets\vipoooool\new-plant-diseases-dataset\versions\2\test\test
+NUM_CLASSES=38

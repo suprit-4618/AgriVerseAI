@@ -1,0 +1,9 @@
+{
+  "name": "AgriVerseAI",
+  "description": "A comprehensive AI-powered portal for the agricultural community, featuring soil analysis, disease detection, government scheme information, and a bilingual AI assistant.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "prompt": ""
+}

@@ -1,0 +1,41 @@
+2025-11-27 23:32:44.386869: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2025-11-27 23:32:55.208292: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Traceback (most recent call last):
+  File "D:\app\debug_model_load.py", line 35, in test_load
+    model = tf.keras.models.load_model(MODEL_PATH, custom_objects={'DepthwiseConv2D': CustomDepthwiseConv2D}, compile=False)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\saving\saving_api.py", line 196, in load_model
+    return legacy_h5_format.load_model_from_hdf5(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\legacy\saving\legacy_h5_format.py", line 137, in load_model_from_hdf5
+    model = saving_utils.model_from_config(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\legacy\saving\saving_utils.py", line 83, in model_from_config
+    return serialization.deserialize_keras_object(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\legacy\saving\serialization.py", line 488, in deserialize_keras_object
+    deserialized_obj = cls.from_config(
+                       ^^^^^^^^^^^^^^^^
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\models\sequential.py", line 375, in from_config
+    model.add(layer)
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\models\sequential.py", line 122, in add
+    self._maybe_rebuild()
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\models\sequential.py", line 149, in _maybe_rebuild
+    self.build(input_shape)
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\layer.py", line 231, in build_wrapper
+    original_build_method(*args, **kwargs)
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\models\sequential.py", line 195, in build
+    x = layer(x)
+        ^^^^^^^^
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\utils\traceback_utils.py", line 122, in error_handler
+    raise e.with_traceback(filtered_tb) from None
+  File "C:\Users\Kiran Nandani\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\backend\common\variables.py", line 583, in standardize_dtype
+    raise ValueError(f"Invalid dtype: {dtype}")
+ValueError: Invalid dtype: tuple
+Checking model at: D:\app\backend\models\plant_disease_model.h5
+Checking mapping at: D:\app\backend\models\class_mapping.json
+Loading model...
+Failed to load model: Invalid dtype: tuple
+Loading mapping...
+Mapping loaded: 38 classes

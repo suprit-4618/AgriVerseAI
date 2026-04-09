@@ -1,0 +1,321 @@
+/* Galaxy/Space Theme for Bhoomi AI - Enhanced Version */
+.bhoomi-galaxy-container {
+    background: radial-gradient(ellipse at bottom, #0f172a 0%, #020617 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Animated Stars Background - Enhanced with more depth */
+.stars-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    background-image:
+        radial-gradient(2px 2px at 20px 30px, #fff, rgba(0, 0, 0, 0)),
+        radial-gradient(2px 2px at 40px 70px, rgba(255, 255, 255, 0.9), rgba(0, 0, 0, 0)),
+        radial-gradient(1px 1px at 50px 160px, #ddd, rgba(0, 0, 0, 0)),
+        radial-gradient(3px 3px at 90px 40px, rgba(147, 197, 253, 0.8), rgba(0, 0, 0, 0)),
+        radial-gradient(1px 1px at 130px 80px, #fff, rgba(0, 0, 0, 0)),
+        radial-gradient(2px 2px at 160px 120px, rgba(167, 139, 250, 0.7), rgba(0, 0, 0, 0)),
+        radial-gradient(1px 1px at 200px 50px, #fff, rgba(0, 0, 0, 0)),
+        radial-gradient(2px 2px at 250px 150px, rgba(74, 222, 128, 0.6), rgba(0, 0, 0, 0));
+    background-repeat: repeat;
+    background-size: 300px 300px;
+    z-index: 0;
+    opacity: 0.7;
+    animation: twinkle 8s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+
+    0%,
+    100% {
+        opacity: 0.7;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Glassmorphism Panels - Enhanced */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 4px 30px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Message Bubbles - Enhanced with gradient animations */
+.msg-bubble-user {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease infinite;
+    box-shadow:
+        0 4px 20px rgba(139, 92, 246, 0.4),
+        0 0 40px rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+@keyframes gradientShift {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.msg-bubble-ai {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    backdrop-filter: blur(16px);
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 0 60px rgba(34, 211, 238, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.msg-bubble-ai::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.3), transparent);
+}
+
+/* Input Area Glow - Enhanced */
+.input-glow-container {
+    background: linear-gradient(to top, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.8));
+    backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 -10px 60px rgba(0, 0, 0, 0.5),
+        0 0 40px rgba(99, 102, 241, 0.05);
+}
+
+.input-field-glow {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.input-field-glow::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0), rgba(168, 85, 247, 0));
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: xor;
+    -webkit-mask-composite: xor;
+    transition: all 0.4s ease;
+    opacity: 0;
+}
+
+.input-field-glow:focus-within {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: transparent;
+}
+
+.input-field-glow:focus-within::before {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(168, 85, 247, 0.5));
+    opacity: 1;
+}
+
+/* Typography & Gradients */
+.text-galaxy-gradient {
+    background: linear-gradient(135deg, #4ade80 0%, #22d3ee 50%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 40px rgba(34, 211, 238, 0.3);
+}
+
+/* Typing Cursor Animation */
+.typing-cursor-animated::after {
+    content: '|';
+    animation: blink 0.8s infinite;
+    color: #22d3ee;
+    font-weight: 300;
+    margin-left: 2px;
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
+}
+
+/* Animations */
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+.floating-element {
+    animation: float 5s ease-in-out infinite;
+}
+
+/* Pulse glow animation for active elements */
+@keyframes pulseGlow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 40px rgba(168, 85, 247, 0.5);
+    }
+}
+
+.pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Fade in up animation */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out;
+}
+
+/* Shimmer effect for loading */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.shimmer {
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.1) 50%,
+            rgba(255, 255, 255, 0) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+/* Scrollbar - Enhanced */
+.galaxy-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.galaxy-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+
+.galaxy-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.3));
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.galaxy-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.5), rgba(168, 85, 247, 0.5));
+    background-clip: padding-box;
+}
+
+/* Button hover effects */
+.btn-glow {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-glow::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.4s ease;
+}
+
+.btn-glow:hover::after {
+    transform: translate(-50%, -50%) scale(2);
+}
+
+/* Listening overlay enhancement */
+.listening-overlay-bg {
+    background: radial-gradient(circle at center,
+            rgba(99, 102, 241, 0.15) 0%,
+            rgba(15, 23, 42, 0.95) 70%);
+}
+
+/* Speaking indicator ring */
+@keyframes speakingRing {
+    0% {
+        box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(34, 211, 238, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+    }
+}
+
+.speaking-indicator {
+    animation: speakingRing 1.5s infinite;
+}
+
+/* Kannada font optimization */
+.font-kannada {
+    font-family: 'Noto Sans Kannada', 'Tunga', sans-serif;
+    line-height: 1.8;
+    letter-spacing: 0.02em;
+}

@@ -1,0 +1,44 @@
+# Environment Variables
+.env
+.env.local
+.env.production
+backend/.env
+frontend/.env
+
+# Dependencies
+node_modules/
+app/frontend/node_modules/
+venv/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Secrets and Keys
+serviceAccountKey.json
+backend/serviceAccountKey.json
+*.pem
+*.key
+
+# IDE Metadata
+.vscode/
+.idea/
+.DS_Store
+
+# Large Data and Models
+backend/models/*.h5
+# Un-comment the line below if you don't want to push the 17MB model file
+# backend/models/plant_disease_model.h5
+
+# OS Files
+Thumbs.db
+desktop.ini
+
+*.db
+app/backend/tokens.db
+
+
+dist/
+build/
+.cache/
+

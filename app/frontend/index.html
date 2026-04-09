@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgriVerseAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Tiro+Kannada&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <style>
+      :root {
+        --color-primary: 22 163 74; /* green-600 */
+        --color-primary-dark: 21 128 61; /* green-700 */
+        --color-secondary: 249 250 251; /* gray-50 */
+        --color-text-primary: 17 24 39; /* gray-900 */
+        --color-text-secondary: 55 65 81; /* gray-600 */
+        --color-accent: 59 130 246; /* blue-500 */
+
+        --theme-green: #65c100;
+        --theme-dark: #1a1a1a;
+      }
+      body {
+        font-family: 'Poppins', 'Inter', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      .font-kannada {
+        font-family: 'Tiro Kannada', serif;
+      }
+      .font-poppins {
+        font-family: 'Poppins', sans-serif;
+      }
+      .glassmorphism {
+          background: rgba(255, 255, 255, 0.1);
+          -webkit-backdrop-filter: blur(20px);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .dark .glassmorphism {
+        background: rgba(26, 26, 26, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .soft-shadow {
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+      }
+      .hero-bg {
+        background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=2670&auto=format&fit=crop');
+        background-size: cover;
+        background-position: center;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.5s ease-in-out forwards;
+      }
+
+      @keyframes slideInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-slideInUp {
+        animation: slideInUp 0.5s ease-out forwards;
+      }
+
+      .bhoomi-home-bg {
+        background-color: #0d0d0f;
+        background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.2), transparent);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .bhoomi-home-bg::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image:
+            linear-gradient(to right, rgba(200, 200, 200, 0.08) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(200, 200, 200, 0.08) 1px, transparent 1px);
+        background-size: 4rem 4rem;
+        opacity: 0.3;
+        mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, black 40%, transparent 100%);
+      }
+
+      @keyframes glow {
+          0% {
+              text-shadow: 0 0 5px rgba(52, 211, 153, 0.3), 0 0 10px rgba(168, 85, 247, 0.3), 0 0 15px rgba(239, 68, 68, 0.3);
+          }
+          50% {
+              text-shadow: 0 0 10px rgba(52, 211, 153, 0.5), 0 0 20px rgba(168, 85, 247, 0.5), 0 0 30px rgba(239, 68, 68, 0.5);
+          }
+          100% {
+              text-shadow: 0 0 5px rgba(52, 211, 153, 0.3), 0 0 10px rgba(168, 85, 247, 0.3), 0 0 15px rgba(239, 68, 68, 0.3);
+          }
+      }
+
+      .animate-glow {
+          animation: glow 4s ease-in-out infinite;
+      }
+
+      .text-gradient-green-blue {
+          background-image: linear-gradient(to right, #22c55e, #3b82f6);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+      }
+      .dark .text-gradient-green-blue {
+          background-image: linear-gradient(to right, #4ade80, #60a5fa);
+      }
+
+      .bhoomi-input-glow {
+          border: 1px solid rgba(120, 119, 198, 0.3);
+          transition: border-color 0.3s ease-in-out;
+      }
+      
+      @keyframes rgb-glow-animation {
+          0%, 100% { border-color: rgba(236, 72, 153, 0.7); box-shadow: 0 0 8px rgba(236, 72, 153, 0.4); }
+          25% { border-color: rgba(168, 85, 247, 0.7); box-shadow: 0 0 8px rgba(168, 85, 247, 0.4); }
+          50% { border-color: rgba(59, 130, 246, 0.7); box-shadow: 0 0 8px rgba(59, 130, 246, 0.4); }
+          75% { border-color: rgba(52, 211, 153, 0.7); box-shadow: 0 0 8px rgba(52, 211, 153, 0.4); }
+      }
+
+      .bhoomi-input-glow:focus-within {
+          animation: rgb-glow-animation 4s linear infinite;
+      }
+      
+      /* Listening Animation Styles */
+      .listening-overlay-bg {
+          background: radial-gradient(ellipse at bottom, hsl(222, 47%, 18%) 0%, hsl(222, 47%, 11%) 100%);
+      }
+      .wave-visualizer {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100px;
+          width: 300px;
+          gap: 4px;
+      }
+      .wave-line {
+          height: 100%;
+          width: 3px;
+          border-radius: 5px;
+          animation: wave-motion 1.5s infinite ease-in-out;
+          transform-origin: bottom;
+          mix-blend-mode: lighten;
+      }
+      @keyframes wave-motion {
+          0% { transform: scaleY(0.05); opacity: 0.5; }
+          50% { transform: scaleY(1); opacity: 1; }
+          100% { transform: scaleY(0.05); opacity: 0.5; }
+      }
+      /* Custom Dark Scrollbar */
+      .dark-scrollbar::-webkit-scrollbar {
+        width: 8px;
+      }
+      .dark-scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+      }
+      .dark-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 10px;
+      }
+      .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
+      
+      @keyframes blink {
+          50% { opacity: 0; }
+      }
+      .typing-cursor::after {
+          content: '|';
+          animation: blink 1s step-end infinite;
+          display: inline-block;
+          margin-left: 3px;
+          font-weight: 300;
+          vertical-align: text-bottom;
+      }
+      @keyframes speaking-pulse {
+        0%, 100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+        }
+        50% {
+          transform: scale(1.1);
+          box-shadow: 0 0 0 8px rgba(52, 211, 153, 0);
+        }
+      }
+      .animate-speaking {
+          animation: speaking-pulse 1.5s infinite;
+      }
+
+      /* Login Page Styles */
+      .login-animation-panel {
+          background: #0c1411;
+      }
+      .login-form-container {
+          background-color: #111827; /* gray-900 */
+          background-image: radial-gradient(ellipse at top, #1f2937, #111827);
+      }
+      .text-shadow {
+          text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+      }
+      .floating-label-input {
+          position: relative;
+          border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+          transition: border-color 0.3s ease;
+      }
+      .floating-label-input:focus-within {
+          border-color: #34d399; /* emerald-400 */
+      }
+      .floating-label-input input:focus + .label-text,
+      .floating-label-input input:not(:placeholder-shown) + .label-text {
+          transform: translateY(-1.25rem) scale(0.75);
+          color: #6ee7b7; /* emerald-300 */
+      }
+      
+      .btn-shimmer {
+          position: relative;
+          overflow: hidden;
+          background: linear-gradient(to right, #10b981, #34d399, #10b981);
+          background-size: 200% auto;
+          transition: background-position 0.5s;
+      }
+
+      .btn-shimmer:hover {
+          background-position: right center;
+      }
+
+      .profile-edit-input {
+        width: 100%;
+        background-color: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        padding: 0.5rem 0.75rem;
+        color: #111827;
+        transition: all 0.2s ease-in-out;
+      }
+      .profile-edit-input:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+        border-color: #3b82f6;
+      }
+      .dark .profile-edit-input {
+        background-color: #374151;
+        border-color: #4b5563;
+        color: #f9fafb;
+      }
+      .dark .profile-edit-input:focus {
+         box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.4);
+         border-color: #60a5fa;
+      }
+      
+      @media print {
+        body {
+            background-color: white;
+            color: black;
+        }
+        .dark {
+            background-color: white !important;
+            color: black !important;
+        }
+        .dark .printable-area, .dark .printable-area * {
+            background-color: white !important;
+            color: black !important;
+            border-color: #ccc !important;
+        }
+        .printable-area {
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+        }
+        .non-printable {
+            display: none !important;
+        }
+        html.dark {
+            --tw-bg-opacity: 1;
+            background-color: white;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.15.0",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.12",
+    "react-dropzone": "https://aistudiocdn.com/react-dropzone@^14.3.8"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-gray-100 dark:bg-gray-900">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
