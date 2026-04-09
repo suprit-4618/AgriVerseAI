@@ -32,35 +32,35 @@ const landingFeatures = [
         description: 'landing_feature1_desc',
         Icon: ThermometerIcon,
         action: 'onWeatherClick',
-        image: 'https://images.unsplash.com/photo-1592210633464-a7db0966ee96?auto=format&fit=crop&q=80&w=2000'
+        image: '/assets/images/weather_feature.png'
     },
     {
         title: 'landing_feature2_title',
         description: 'landing_feature2_desc',
         Icon: LayersIcon,
         action: 'onSoilAnalysisClick',
-        image: 'https://images.unsplash.com/photo-1592982537447-6f2a6a0c3c1b?auto=format&fit=crop&q=80&w=2000'
+        image: '/assets/images/soil_feature.png'
     },
     {
         title: 'landing_feature3_title',
         description: 'landing_feature3_desc',
         Icon: SparklesIcon,
         action: 'onAssistantClick',
-        image: 'https://images.unsplash.com/photo-1531746790731-6c087fecd05a?auto=format&fit=crop&q=80&w=2000'
+        image: '/assets/images/assistant_feature.png'
     },
     {
         title: 'landing_feature4_title',
         description: 'landing_feature4_desc',
         Icon: BugIcon,
         action: 'onPlantAnalysisClick',
-        image: 'https://images.unsplash.com/photo-1596733430284-f7437764b1a9?auto=format&fit=crop&q=80&w=2000'
+        image: '/assets/images/plant_feature.png'
     },
     {
         title: 'landing_feature5_title',
         description: 'landing_feature5_desc',
         Icon: BuildingIcon,
         action: 'onMarketplaceClick',
-        image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=2000'
+        image: '/assets/images/market_feature.png'
     }
 ];
 
@@ -232,7 +232,10 @@ const LandingPage: React.FC<LandingPageProps> = (props) => {
                                         key={feature.title}
                                         className="relative p-6 rounded-xl cursor-pointer transition-all duration-300"
                                         onMouseEnter={() => setHoveredFeature(index)}
-                                        onClick={getAction(feature.action)}
+                                        onClick={() => {
+                                            setHoveredFeature(index);
+                                            getAction(feature.action)();
+                                        }}
                                         initial={{ opacity: 0, x: -20 }}
                                         whileInView={{ opacity: 1, x: 0 }}
                                         viewport={{ once: true, amount: 0.5 }}
