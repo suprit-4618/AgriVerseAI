@@ -119,4 +119,4 @@ Create a `.env` file in both `frontend` and `backend` using the provided `.env.t
 ##  Contributors
 Developed with ❤️ by the **AgriVerseAI Team**. 
 
-**License:** MIT
+
