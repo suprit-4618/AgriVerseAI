@@ -3,13 +3,16 @@ import { GoogleGenAI, Chat, Type, Part, Modality } from "@google/genai";
 import { GEMINI_MODEL_TEXT, GEMINI_MODEL_VISION } from '../constants';
 import { SoilData, SoilAnalysisReport, PlantAnalysisReport, MarketAnalysisReport, SoilImageAnalysisReport } from '../types';
 
-const API_KEY = process.env.API_KEY;
+const API_KEY = process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
 
 if (!API_KEY) {
   console.error("API_KEY for Gemini is not set in process.env.API_KEY");
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY || "" });
+const ai = new GoogleGenAI({ 
+  apiKey: API_KEY || "",
+  apiVersion: 'v1beta'
+});
 
 export const createChatSession = (): Chat => {
   if (!API_KEY) {
@@ -48,9 +51,9 @@ export const createChatSession = (): Chat => {
 Be the friend every farmer wishes they had - someone who listens, cares, and helps with a smile! 🌻`;
 
   const chat = ai.chats.create({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_MODEL_TEXT,
     config: {
-      systemInstruction,
+      systemInstruction: { parts: [{ text: systemInstruction }] },
     },
   });
   return chat;
@@ -131,9 +134,9 @@ export const getSoilAnalysis = async (data: SoilData, location: { district: stri
   try {
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL_TEXT,
-      contents: { parts: [{ text: promptText }] },
+      contents: [{ parts: [{ text: promptText }] }],
       config: {
-        systemInstruction: systemInstruction,
+        systemInstruction: { parts: [{ text: systemInstruction }] },
         responseMimeType: "application/json",
         responseSchema: responseSchema,
         temperature: 0.5,
@@ -145,7 +148,7 @@ export const getSoilAnalysis = async (data: SoilData, location: { district: stri
 
   } catch (e) {
     console.error("Error in getSoilAnalysis service:", e);
-    throw new Error("Failed to get analysis from AI. Please try again.");
+    throw new Error(`Failed to get analysis: ${e instanceof Error ? e.message : 'Unknown error'}`);
   }
 };
 
@@ -245,9 +248,9 @@ export const getPlantDiseaseAnalysis = async (base64Image: string, imageMimeType
 
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL_TEXT,
-        contents: { parts: [{ text: prompt }] },
+        contents: [{ parts: [{ text: prompt }] }],
         config: {
-          systemInstruction,
+          systemInstruction: { parts: [{ text: systemInstruction }] },
           responseMimeType: "application/json",
           responseSchema,
           temperature: 0.4,
@@ -376,11 +379,11 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
   try {
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL_VISION,
-      contents: { parts: contents },
+      contents: [{ parts: contents }],
       config: {
-        systemInstruction,
+        systemInstruction: { parts: [{ text: systemInstruction }] },
         responseMimeType: "application/json",
-        responseSchema,
+        responseSchema: responseSchema,
         temperature: 0.3,
       },
     });
@@ -452,9 +455,9 @@ export const getMarketAnalysis = async (cropName: string, marketName: string): P
   try {
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL_TEXT,
-      contents: { parts: [{ text: promptText }] },
+      contents: [{ parts: [{ text: promptText }] }],
       config: {
-        systemInstruction,
+        systemInstruction: { parts: [{ text: systemInstruction }] },
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.7,
@@ -553,9 +556,9 @@ export const getSoilAnalysisFromImage = async (base64Image: string, imageMimeTyp
   try {
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL_VISION,
-      contents: { parts: contents },
+      contents: [{ parts: contents }],
       config: {
-        systemInstruction,
+        systemInstruction: { parts: [{ text: systemInstruction }] },
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.4,
@@ -612,9 +615,9 @@ export const getPriceEstimate = async (
   try {
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL_TEXT,
-      contents: { parts: [{ text: prompt }] },
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
-        systemInstruction,
+        systemInstruction: { parts: [{ text: systemInstruction }] },
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.2,
@@ -638,8 +641,8 @@ export const generateSpeech = async (text: string): Promise<string | undefined> 
     throw new Error("API_KEY_MISSING");
   }
 
-  // The model name is gemini-2.5-flash-preview-tts
-  const model = 'gemini-2.5-flash-preview-tts';
+  // Use the standard gemini-1.5-flash model
+  const model = 'gemini-1.5-flash';
 
   try {
     const response = await ai.models.generateContent({

@@ -26,12 +26,12 @@ processes = []
 
 def run_backend():
     """Start the FastAPI backend server."""
-    print("\n🚀 Starting Backend Server (FastAPI with Uvicorn)...")
-    print(f"   📍 URL: http://localhost:{BACKEND_PORT}")
-    print(f"   📁 Directory: {BACKEND_DIR}\n")
+    print("\nStarting Backend Server (FastAPI with Uvicorn)...")
+    print(f"   URL: http://localhost:{BACKEND_PORT}")
+    print(f"   Directory: {BACKEND_DIR}\n")
     
     backend_process = subprocess.Popen(
-        [str(VENV_PYTHON), "-m", "uvicorn", "api:app", "--reload", "--port", str(BACKEND_PORT)],
+        [str(VENV_PYTHON), "-X", "utf8", "-m", "uvicorn", "api:app", "--reload", "--port", str(BACKEND_PORT)],
         cwd=str(BACKEND_DIR),
         stdout=sys.stdout,
         stderr=sys.stderr,
@@ -43,9 +43,9 @@ def run_backend():
 
 def run_frontend():
     """Start the Vite frontend development server."""
-    print("\n🌐 Starting Frontend Server (Vite)...")
-    print(f"   📍 URL: http://localhost:{FRONTEND_PORT}")
-    print(f"   📁 Directory: {FRONTEND_DIR}\n")
+    print("\nStarting Frontend Server (Vite)...")
+    print(f"   URL: http://localhost:{FRONTEND_PORT}")
+    print(f"   Directory: {FRONTEND_DIR}\n")
     
     # Use npm on Windows
     npm_cmd = "npm.cmd" if os.name == 'nt' else "npm"
@@ -63,7 +63,7 @@ def run_frontend():
 
 def cleanup(signum=None, frame=None):
     """Clean up all running processes."""
-    print("\n\n🛑 Shutting down servers...")
+    print("\n\nShutting down servers...")
     for process in processes:
         try:
             if os.name == 'nt':
@@ -72,28 +72,28 @@ def cleanup(signum=None, frame=None):
                 os.killpg(os.getpgid(process.pid), signal.SIGTERM)
         except Exception:
             pass
-    print("✅ All servers stopped.")
+    print("All servers stopped.")
     sys.exit(0)
 
 
 def main():
     print("=" * 60)
-    print("        🌱 AGRIVERSE AI - Application Launcher 🌱")
+    print("        AGRIVERSE AI - Application Launcher")
     print("=" * 60)
     
     # Check if frontend directory exists
     if not FRONTEND_DIR.exists():
-        print(f"❌ Frontend directory not found: {FRONTEND_DIR}")
+        print(f"Frontend directory not found: {FRONTEND_DIR}")
         sys.exit(1)
     
     # Check if backend directory exists
     if not BACKEND_DIR.exists():
-        print(f"❌ Backend directory not found: {BACKEND_DIR}")
+        print(f"Backend directory not found: {BACKEND_DIR}")
         sys.exit(1)
     
     # Check if virtual environment exists
     if not VENV_PYTHON.exists():
-        print(f"❌ Python virtual environment not found: {VENV_PYTHON}")
+        print(f"Python virtual environment not found: {VENV_PYTHON}")
         print("   Run: python -m venv .venv && .venv\\Scripts\\pip install -r backend\\requirements.txt")
         sys.exit(1)
     
@@ -109,10 +109,10 @@ def main():
     frontend_thread.start()
     
     print("\n" + "=" * 60)
-    print("  ✅ Both servers are starting...")
-    print(f"  🔗 Frontend: http://localhost:{FRONTEND_PORT}")
-    print(f"  🔗 Backend:  http://localhost:{BACKEND_PORT} (Uvicorn)")
-    print("  📝 Press Ctrl+C to stop all servers")
+    print("  Both servers are starting...")
+    print(f"  Frontend: http://localhost:{FRONTEND_PORT}")
+    print(f"  Backend:  http://localhost:{BACKEND_PORT} (Uvicorn)")
+    print("  Press Ctrl+C to stop all servers")
     print("=" * 60 + "\n")
     
     # Wait for processes to complete

@@ -2,8 +2,8 @@
 
 import { Language, UIStrings, ExampleCategory, HistoricalDataPoint } from './types';
 
-export const GEMINI_MODEL_TEXT = 'gemini-2.5-flash';
-export const GEMINI_MODEL_VISION = 'gemini-2.5-flash';
+export const GEMINI_MODEL_TEXT = 'gemini-1.5-flash';
+export const GEMINI_MODEL_VISION = 'gemini-1.5-flash';
 
 export const karnatakaDistricts = [
     { name: 'Bagalkote', lat: 16.18, lon: 75.7 },
