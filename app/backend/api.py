@@ -252,6 +252,28 @@ async def get_classes():
     }
 
 # ============================================================
+# TTS PROXY ENDPOINT
+# ============================================================
+
+@app.get("/tts")
+async def get_tts(text: str, lang: str):
+    import urllib.request
+    import urllib.parse
+    from fastapi.responses import Response
+    
+    encoded_text = urllib.parse.quote(text)
+    url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded_text}&tl={lang}&client=tw-ob"
+    
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            audio_data = response.read()
+            return Response(content=audio_data, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"TTS Proxy Error: {e}")
+        raise HTTPException(status_code=500, detail="TTS failed")
+
+# ============================================================
 # TOKEN MANAGEMENT ENDPOINTS
 # ============================================================
 
