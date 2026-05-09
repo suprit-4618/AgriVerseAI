@@ -89,13 +89,6 @@ const App: React.FC = () => {
                         location: 'Karnataka, India',
                         details: details
                     });
-                    
-                    // Restore dashboard state on refresh
-                    if (parsedRole === UserRole.ADMIN) {
-                        setCurrentPage('admin_dashboard');
-                    } else if (parsedRole === UserRole.BUYER) {
-                        setCurrentPage('buyer_dashboard');
-                    }
                 } else {
                     setCurrentUser(null);
                 }
@@ -130,13 +123,7 @@ const App: React.FC = () => {
         setIsAppLoading(true);
         setTimeout(() => {
             setIsAppLoading(false);
-            if (updatedUser.role === UserRole.ADMIN) {
-                setCurrentPage('admin_dashboard');
-            } else if (updatedUser.role === UserRole.BUYER) {
-                setCurrentPage('buyer_dashboard');
-            } else {
-                setCurrentPage('home');
-            }
+            setCurrentPage('home');
         }, 1500);
     };
 
@@ -271,8 +258,8 @@ const App: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {/* Modals - Only relevant for User/Farmer Role */}
-            {currentUser?.role === UserRole.USER && (
+            {/* Modals - Accessible to all logged-in users from Platform Home */}
+            {currentUser && (
                 <AnimatePresence>
                     {isWeatherModalOpen && (
                         <motion.div

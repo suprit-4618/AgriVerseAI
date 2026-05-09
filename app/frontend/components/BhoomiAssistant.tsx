@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserProfile, Language, UIStringContent, ChatMessage, PlantAnalysisReport } from '../types';
+import { Language, UserProfile, UIStringContent, ChatMessage } from '../types';
 import { uiStrings } from '../constants';
 import Button from './common/Button';
 import LoadingSpinner from './common/LoadingSpinner';
-import { createChatSession, getPlantDiseaseAnalysis } from '../services/geminiService';
-import { Chat } from '@google/genai';
+import { getPlantDiseaseAnalysis } from '../services/geminiService';
+import { sendMessageToGroq } from '../services/groqService';
 import {
     ArrowLeftIcon, PaperClipIcon, XCircleIcon, MicrophoneIcon, PaperAirplaneIcon, SparklesIcon,
     SpeakerWaveIcon, SpeakerXMarkIcon, UserCircleIcon
@@ -511,22 +511,20 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     const [currentView, setCurrentView] = useState<'home' | 'chat'>('home');
     const [history, setHistory] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [chat, setChat] = useState<Chat | null>(null);
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
     const [isRecording, setIsRecording] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [speechError, setSpeechError] = useState<string | null>(null);
+    const isSendingRef = useRef(false);
 
-    // ============ INSTANT BROWSER TTS - ZERO LATENCY ============
-    // Using browser's built-in SpeechSynthesis for INSTANT speech
+    // ============ HIGH QUALITY CLOUD TTS ============
     const speechQueueRef = useRef<string[]>([]);
     const isProcessingQueueRef = useRef(false);
+    const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+    const speechSessionIdRef = useRef(0);
 
     useEffect(() => {
-        try {
-            setChat(createChatSession());
-            setHistory([]);
-        } catch (error) { console.error(error); }
+        setHistory([]);
 
         // Preload browser voices
         if (window.speechSynthesis) {
@@ -535,26 +533,77 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         }
 
         return () => handleCancelSpeak();
-    }, [currentLanguage]);
+    }, []); // Removed currentLanguage to prevent chat clearing on language toggle
 
     const handleCancelSpeak = useCallback(() => {
+        console.log("Cancelling speech and incrementing session ID");
+        speechSessionIdRef.current += 1;
         speechQueueRef.current = [];
         isProcessingQueueRef.current = false;
+        
+        if (currentAudioRef.current) {
+            currentAudioRef.current.pause();
+            currentAudioRef.current.src = ""; // Force stop and clear buffer
+            currentAudioRef.current = null;
+        }
+        
         if (window.speechSynthesis) {
             window.speechSynthesis.cancel();
         }
         setIsSpeaking(false);
     }, []);
 
-    // INSTANT speech using browser's native TTS
-    const processSpeechQueue = useCallback(() => {
-        if (isProcessingQueueRef.current || speechQueueRef.current.length === 0) {
-            if (speechQueueRef.current.length === 0) setIsSpeaking(false);
+    const fallbackToBrowserTTS = (plainText: string) => {
+        const sessionIdAtStart = speechSessionIdRef.current;
+        
+        if (!window.speechSynthesis) {
+            isProcessingQueueRef.current = false;
+            processSpeechQueue();
             return;
         }
 
-        if (!window.speechSynthesis) {
-            console.warn('SpeechSynthesis not available');
+        const utterance = new SpeechSynthesisUtterance(plainText);
+        const voices = window.speechSynthesis.getVoices();
+        
+        let voice = voices.find(v => v.name.includes('Google') && v.lang.includes('IN'));
+        if (!voice) voice = voices.find(v => v.lang.includes('IN') && v.name.toLowerCase().includes('female'));
+        if (!voice) voice = voices.find(v => v.lang.includes('IN'));
+        
+        if (!voice) {
+            const langCode = currentLanguage === Language.KN ? 'kn' : 'en';
+            voice = voices.find(v => v.lang.startsWith(langCode));
+        }
+        if (!voice) voice = voices.find(v => v.lang.startsWith('en'));
+
+        if (voice) utterance.voice = voice;
+
+        utterance.rate = 1.0; // Reset to natural speed
+        utterance.pitch = 1.0; 
+        utterance.volume = 1.0;
+        utterance.lang = currentLanguage === Language.KN ? 'kn-IN' : 'en-US';
+
+        utterance.onend = () => {
+            if (speechSessionIdRef.current !== sessionIdAtStart) {
+                console.log("Ignoring onend for stale session");
+                return;
+            }
+            isProcessingQueueRef.current = false;
+            processSpeechQueue();
+        };
+
+        utterance.onerror = (e) => {
+            console.error("Browser TTS Error:", e);
+            if (speechSessionIdRef.current !== sessionIdAtStart) return;
+            isProcessingQueueRef.current = false;
+            processSpeechQueue();
+        };
+
+        window.speechSynthesis.speak(utterance);
+    };
+
+    const processSpeechQueue = useCallback(async () => {
+        if (isProcessingQueueRef.current || speechQueueRef.current.length === 0) {
+            if (speechQueueRef.current.length === 0) setIsSpeaking(false);
             return;
         }
 
@@ -565,52 +614,66 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         if (!textToSpeak) {
             isProcessingQueueRef.current = false;
             setIsSpeaking(false);
+            processSpeechQueue();
             return;
         }
 
-        const plainText = removeMarkdown(textToSpeak).trim();
+        // Strip markdown and emojis before speaking
+        const plainText = removeMarkdown(textToSpeak)
+            .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
+            .trim();
+            
         if (!plainText) {
             isProcessingQueueRef.current = false;
             processSpeechQueue();
             return;
         }
 
-        // Create utterance - INSTANT, no network call!
-        const utterance = new SpeechSynthesisUtterance(plainText);
+        try {
+            const sessionIdAtStart = speechSessionIdRef.current;
+            console.log(`Processing speech queue. Session: ${sessionIdAtStart}, Text: ${plainText.substring(0, 30)}...`);
 
-        // Find best voice for the language
-        const voices = window.speechSynthesis.getVoices();
-        const langCode = currentLanguage === Language.KN ? 'kn' : 'en';
-
-        // Try to find a female voice
-        let voice = voices.find(v => v.lang.startsWith(langCode) && v.name.toLowerCase().includes('female'));
-        if (!voice) voice = voices.find(v => v.lang.startsWith(langCode));
-        if (!voice && currentLanguage === Language.KN) {
-            // Fallback: Hindi or any Indian voice for Kannada
-            voice = voices.find(v => v.lang.includes('hi') || v.lang.includes('IN'));
+            // Use Google Translate's Neural TTS endpoint for a highly realistic human voice
+            const tl = currentLanguage === Language.KN ? 'kn' : 'en-IN'; 
+            const encodedText = encodeURIComponent(plainText.substring(0, 195)); 
+            const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=${tl}&client=tw-ob`;
+            
+            const audio = new Audio(audioUrl);
+            currentAudioRef.current = audio;
+            
+            audio.onended = () => {
+                if (speechSessionIdRef.current !== sessionIdAtStart) {
+                    console.log("Ignoring onended for stale session");
+                    return;
+                }
+                currentAudioRef.current = null;
+                isProcessingQueueRef.current = false;
+                processSpeechQueue();
+            };
+            
+            audio.onerror = () => {
+                if (speechSessionIdRef.current !== sessionIdAtStart) return;
+                console.error("Audio playback error, falling back to native TTS");
+                audio.pause();
+                audio.src = "";
+                currentAudioRef.current = null;
+                isProcessingQueueRef.current = false;
+                fallbackToBrowserTTS(plainText);
+            };
+            
+            audio.play().catch(e => {
+                if (speechSessionIdRef.current !== sessionIdAtStart) return;
+                console.error("Audio play failed, falling back to native TTS:", e);
+                audio.pause();
+                audio.src = "";
+                currentAudioRef.current = null;
+                isProcessingQueueRef.current = false;
+                fallbackToBrowserTTS(plainText);
+            });
+        } catch (e) {
+            console.error("TTS API Error:", e);
+            fallbackToBrowserTTS(plainText);
         }
-        if (!voice) voice = voices.find(v => v.lang.startsWith('en'));
-
-        if (voice) utterance.voice = voice;
-
-        // Optimize for natural, fast speech
-        utterance.rate = 1.1; // Slightly faster
-        utterance.pitch = 1.05; // Slightly higher for friendly tone
-        utterance.volume = 1.0;
-        utterance.lang = currentLanguage === Language.KN ? 'kn-IN' : 'en-US';
-
-        utterance.onend = () => {
-            isProcessingQueueRef.current = false;
-            processSpeechQueue(); // Continue with next in queue
-        };
-
-        utterance.onerror = () => {
-            isProcessingQueueRef.current = false;
-            processSpeechQueue(); // Try next
-        };
-
-        // Speak IMMEDIATELY - no waiting!
-        window.speechSynthesis.speak(utterance);
     }, [currentLanguage]);
 
     const queueSpeech = useCallback((text: string) => {
@@ -627,8 +690,9 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     };
 
     const handleSendMessage = useCallback(async (message: string, attachment: File | null) => {
-        if (!chat) return;
-
+        if (isSendingRef.current || isLoading) return;
+        
+        isSendingRef.current = true;
         handleCancelSpeak(); // Clear previous speech
         setCurrentView('chat');
         setIsLoading(true);
@@ -658,48 +722,91 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                 setHistory(prev => [...prev, { id: `model-err-${Date.now()}`, role: 'model', text: `${texts.errorPrefix} ${e.message}` }]);
             } finally {
                 setIsLoading(false);
+                isSendingRef.current = false;
             }
             return;
         }
 
-        // Standard text-based chat with Streaming TTS
+        // Standard text-based chat with Groq Streaming TTS
         try {
-            const stream = await chat.sendMessageStream({ message });
+            // Append a hidden system instruction to ensure the AI replies in the selected language
+            const langPrompt = currentLanguage === Language.KN 
+                ? "\n\n(System: Please reply to this message strictly in Kannada script.)" 
+                : "\n\n(System: Please reply to this message strictly in English.)";
+                
+            const groqMessages = history.map(msg => ({
+                role: msg.role === 'user' ? 'user' : 'assistant',
+                content: msg.text || ''
+            }));
+            groqMessages.push({ role: 'user', content: message + langPrompt });
+
+            const stream = await sendMessageToGroq(groqMessages);
+            if (!stream) throw new Error("No response stream from Groq");
+
             let fullResponse = '';
             let chunkBuffer = '';
             const modelMessageId = `model-${Date.now()}`;
             setHistory(prev => [...prev, { id: modelMessageId, role: 'model', text: '' }]);
 
-            for await (const chunk of stream) {
-                const newText = chunk.text;
-                fullResponse += newText;
-                chunkBuffer += newText;
+            const sessionIdAtStreamStart = speechSessionIdRef.current;
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
 
-                setHistory(prev => prev.map(m => m.id === modelMessageId ? { ...m, text: fullResponse } : m));
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (speechSessionIdRef.current !== sessionIdAtStreamStart) break;
 
-                if (isVoiceEnabled) {
-                    // INSTANT Browser TTS - speak quickly as text arrives
-                    // Use smaller chunks for immediate speech (no network delay)
-                    const sentenceEnd = chunkBuffer.match(/[.!?।,]\s*$/);
-                    if (sentenceEnd || chunkBuffer.length > 30) {
-                        queueSpeech(chunkBuffer);
-                        chunkBuffer = '';
+                const text = decoder.decode(value);
+                const lines = text.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') break;
+                        try {
+                            const json = JSON.parse(data);
+                            const delta = json.choices[0].delta?.content || '';
+                            if (delta) {
+                                fullResponse += delta;
+                                chunkBuffer += delta;
+
+                                // Update UI
+                                setHistory(prev => prev.map(m => m.id === modelMessageId ? { ...m, text: fullResponse } : m));
+
+                                // Stream to TTS logic
+                                if (isVoiceEnabled) {
+                                    const punctuation = ['.', '?', '!', '\n', '।', ':', ';'];
+                                    if (punctuation.some(p => chunkBuffer.includes(p)) || chunkBuffer.length > 60) {
+                                        const sentences = chunkBuffer.split(/([.?!।\n:;])/);
+                                        while (sentences.length > 2) {
+                                            const sentence = sentences.shift()! + sentences.shift()!;
+                                            if (sentence.trim()) queueSpeech(sentence.trim());
+                                        }
+                                        chunkBuffer = sentences.join('');
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // Incomplete JSON chunk, skip
+                        }
                     }
                 }
             }
 
-            // Speak any remaining text in buffer
-            if (isVoiceEnabled && chunkBuffer.trim()) {
-                queueSpeech(chunkBuffer);
+            // Flush remaining buffer
+            if (isVoiceEnabled && chunkBuffer.trim() && speechSessionIdRef.current === sessionIdAtStreamStart) {
+                queueSpeech(chunkBuffer.trim());
             }
 
-        } catch (e) {
-            console.error(e);
-            setHistory(prev => [...prev, { id: `model-err-${Date.now()}`, role: 'model', text: texts.errorApiGeneric }]);
+        } catch (e: any) {
+            console.error("Groq Chat Error:", e);
+            setHistory(prev => [...prev, { id: `model-err-${Date.now()}`, role: 'model', text: `${texts.errorPrefix} ${e.message}` }]);
         } finally {
             setIsLoading(false);
+            isSendingRef.current = false;
         }
-    }, [chat, isVoiceEnabled, queueSpeech, handleCancelSpeak, texts, currentLanguage]);
+    }, [currentLanguage, history, isVoiceEnabled, queueSpeech, texts, isLoading]);
 
     const goHome = () => {
         handleCancelSpeak();
