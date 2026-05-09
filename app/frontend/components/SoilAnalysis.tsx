@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UIStringContent, SoilData, SoilAnalysisReport, CropRecommendation, DistrictData, Taluk, Village, NutrientDetail, SavedSoilReport } from '../types';
 import Button from './common/Button';
 import LoadingSpinner from './common/LoadingSpinner';
-import { getSoilAnalysis } from '../services/geminiService';
+import { getSoilAnalysis } from '../services/groqService';
 import { CheckBadgeIcon, CircleStackIcon, SparklesIcon, MapPinIcon, ExclamationTriangleIcon, ClockIcon, PhotoIcon, InformationCircleIcon, XCircleIcon } from './common/IconComponents';
 import { karnatakaLocationData } from '../data/karnatakaLocationData';
 import { soilDatasetInfo } from '../data/soilDataset';

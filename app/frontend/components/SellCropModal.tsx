@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UIStringContent, CropCategory, UserProfile, WeatherData } from '../types';
 import { karnatakaMarkets } from '../constants';
-import { getPriceEstimate } from '../services/geminiService';
+import { getPriceEstimate } from '../services/groqService';
 import { marketService } from '../services/marketService';
 import * as weatherService from '../services/weatherService';
 import Button from './common/Button';

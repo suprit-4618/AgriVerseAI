@@ -3,7 +3,7 @@ import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UIStringContent, MarketAnalysisReport, Language } from '../types';
 import { karnatakaMarkets, marketCrops } from '../constants';
-import { getMarketAnalysis } from '../services/geminiService';
+import { getMarketAnalysis } from '../services/groqService';
 import Button from './common/Button';
 import LoadingSpinner from './common/LoadingSpinner';
 import Select from './common/Select';
