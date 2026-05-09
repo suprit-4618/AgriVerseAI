@@ -322,8 +322,6 @@ const LandingPage: React.FC<LandingPageProps> = (props) => {
                                 <h4 className="font-semibold text-white mb-4">Company</h4>
                                 <ul className="space-y-3">
                                     <li><button onClick={() => onNavigate('about')} className="text-gray-400 hover:text-green-400 transition">About Us</button></li>
-                                    <li><button onClick={() => onNavigate('careers')} className="text-gray-400 hover:text-green-400 transition">Careers</button></li>
-                                    <li><button onClick={() => onNavigate('contact')} className="text-gray-400 hover:text-green-400 transition">Contact</button></li>
                                 </ul>
                             </div>
                             <div>

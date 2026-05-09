@@ -24,6 +24,9 @@ const LegalPage: React.FC<LegalPageProps> = ({ onBack, pageType }) => {
 
                     <h3>Data Security</h3>
                     <p>The security of your data is important to us but remember that no method of transmission over the Internet or method of electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your Personal Data, we cannot guarantee its absolute security.</p>
+
+                    <h3 className="text-amber-400">Strict Non-Copying Policy</h3>
+                    <p>Users are strictly prohibited from copying, scraping, or duplicating any part of the AgriVerseAI application, its data models, or its output. Any unauthorized use of our proprietary work is a violation of international copyright laws. You must obtain express written permission from AgriVerseAI before using any part of our service for external purposes.</p>
                 </div>
             )
         },
@@ -40,8 +43,9 @@ const LegalPage: React.FC<LegalPageProps> = ({ onBack, pageType }) => {
                      <h3>2. User Content</h3>
                      <p>Our Service allows you to post, link, store, share and otherwise make available certain information, text, graphics, videos, or other material ("Content"), such as images of plants for analysis. You are responsible for the Content that you post to the Service, including its legality, reliability, and appropriateness. By posting Content to the Service, you grant us the right and license to use, modify, publicly perform, publicly display, reproduce, and distribute such Content on and through the Service for the purpose of operating and improving the service.</p>
 
-                     <h3>3. Intellectual Property</h3>
+                     <h3>3. Intellectual Property & No-Copy Rule</h3>
                      <p>The Service and its original content (excluding Content provided by users), features and functionality are and will remain the exclusive property of AgriVerseAI and its licensors. The Service is protected by copyright, trademark, and other laws of both India and foreign countries.</p>
+                     <p className="font-bold text-amber-400">NO UNAUTHORIZED COPYING: You are strictly forbidden from copying, reproducing, or redistributing our work, including our proprietary AI algorithms and UI designs. To use any part of our work, you MUST request and receive explicit written permission from us.</p>
 
                      <h3>4. Disclaimer</h3>
                      <p>The Service is provided on an "AS IS" and "AS AVAILABLE" basis. The Service is provided without warranties of any kind, whether express or implied. The information and recommendations provided by our AI, including but not limited to crop recommendations, disease analysis, and treatment suggestions, are for informational purposes only and should not be considered as professional agricultural advice. AgriVerseAI does not guarantee the accuracy, completeness, or usefulness of any information on the Service and neither adopts nor endorses nor is responsible for the accuracy or reliability of any opinion, advice, or statement made. Always consult with a qualified professional before making any farming decisions.</p>
