@@ -2,8 +2,8 @@
 
 import { Language, UIStrings, ExampleCategory, HistoricalDataPoint } from './types';
 
-export const GEMINI_MODEL_TEXT = 'gemini-1.5-flash';
-export const GEMINI_MODEL_VISION = 'gemini-1.5-flash';
+export const GEMINI_MODEL_TEXT = 'gemini-1.5-flash-latest';
+export const GEMINI_MODEL_VISION = 'gemini-1.5-flash-latest';
 
 export const karnatakaDistricts = [
     { name: 'Bagalkote', lat: 16.18, lon: 75.7 },
@@ -100,6 +100,7 @@ const enStrings = {
     landing_nav_about: "About",
     landing_nav_services: "Features",
     landing_nav_contact: "Contact",
+    landing_version: "v1.1.0",
     landing_hero_tagline: "The Future of Farming is Here",
     landing_hero_title: "Build Health with Technology",
     landing_hero_subtitle: "Harnessing AI to provide the best agricultural solutions for farmers across Karnataka.",
