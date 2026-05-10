@@ -10,8 +10,7 @@ if (!API_KEY) {
 }
 
 const ai = new GoogleGenAI({ 
-  apiKey: API_KEY || "",
-  apiVersion: 'v1'
+  apiKey: API_KEY || ""
 });
 
 export const createChatSession = (): Chat => {
@@ -53,7 +52,7 @@ Be the friend every farmer wishes they had - someone who listens, cares, and hel
   const chat = ai.chats.create({
     model: GEMINI_MODEL_TEXT,
     config: {
-      systemInstruction: { parts: [{ text: systemInstruction }] },
+      systemInstruction: systemInstruction,
     },
   });
   return chat;
@@ -136,7 +135,7 @@ export const getSoilAnalysis = async (data: SoilData, location: { district: stri
       model: GEMINI_MODEL_TEXT,
       contents: [{ parts: [{ text: promptText }] }],
       config: {
-        systemInstruction: { parts: [{ text: systemInstruction }] },
+        systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema: responseSchema,
         temperature: 0.5,
@@ -250,7 +249,7 @@ export const getPlantDiseaseAnalysis = async (base64Image: string, imageMimeType
         model: GEMINI_MODEL_TEXT,
         contents: [{ parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: { parts: [{ text: systemInstruction }] },
+          systemInstruction: systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
           temperature: 0.4,
@@ -381,7 +380,7 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
       model: GEMINI_MODEL_VISION,
       contents: [{ parts: contents }],
       config: {
-        systemInstruction: { parts: [{ text: systemInstruction }] },
+        systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema: responseSchema,
         temperature: 0.3,
@@ -459,7 +458,7 @@ export const getMarketAnalysis = async (cropName: string, marketName: string): P
       model: GEMINI_MODEL_TEXT,
       contents: [{ parts: [{ text: promptText }] }],
       config: {
-        systemInstruction: { parts: [{ text: systemInstruction }] },
+        systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.7,
@@ -560,7 +559,7 @@ export const getSoilAnalysisFromImage = async (base64Image: string, imageMimeTyp
       model: GEMINI_MODEL_VISION,
       contents: [{ parts: contents }],
       config: {
-        systemInstruction: { parts: [{ text: systemInstruction }] },
+        systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.4,
@@ -619,7 +618,7 @@ export const getPriceEstimate = async (
       model: GEMINI_MODEL_TEXT,
       contents: [{ parts: [{ text: prompt }] }],
       config: {
-        systemInstruction: { parts: [{ text: systemInstruction }] },
+        systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.2,
