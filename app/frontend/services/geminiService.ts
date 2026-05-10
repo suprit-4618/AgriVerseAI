@@ -393,7 +393,9 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
 
   } catch (e) {
     console.error("Error in getPlantDiseaseAnalysis service:", e);
-    throw new Error("Failed to get analysis from AI. Please try again with a clearer image.");
+    // Provide a more descriptive error message to help identify the root cause
+    const errorDetail = e instanceof Error ? e.message : "Unknown error";
+    throw new Error(`AI Analysis Failed: ${errorDetail}. Please check if the image is clear and contains a plant.`);
   }
 };
 
