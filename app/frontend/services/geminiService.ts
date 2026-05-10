@@ -11,7 +11,7 @@ if (!API_KEY) {
 
 const ai = new GoogleGenAI({ 
   apiKey: API_KEY || "",
-  apiVersion: 'v1beta'
+  apiVersion: 'v1'
 });
 
 export const createChatSession = (): Chat => {
