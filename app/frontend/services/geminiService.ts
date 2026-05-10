@@ -3,10 +3,10 @@ import { GoogleGenAI, Chat, Type, Part, Modality } from "@google/genai";
 import { GEMINI_MODEL_TEXT, GEMINI_MODEL_VISION } from '../constants';
 import { SoilData, SoilAnalysisReport, PlantAnalysisReport, MarketAnalysisReport, SoilImageAnalysisReport } from '../types';
 
-const API_KEY = process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 if (!API_KEY) {
-  console.error("API_KEY for Gemini is not set in process.env.API_KEY");
+  console.error("VITE_GEMINI_API_KEY is not set in environment variables");
 }
 
 const ai = new GoogleGenAI({ 
@@ -637,17 +637,15 @@ export const getPriceEstimate = async (
  * @param text The text to speak.
  * @returns A base64 encoded string of the audio data.
  */
+
 export const generateSpeech = async (text: string): Promise<string | undefined> => {
   if (!API_KEY) {
     throw new Error("API_KEY_MISSING");
   }
 
-  // Use the standard gemini-1.5-flash model
-  const model = 'gemini-1.5-flash';
-
   try {
     const response = await ai.models.generateContent({
-      model,
+      model: GEMINI_MODEL_TEXT,
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO], // Must be an array with a single `Modality.AUDIO` element.
