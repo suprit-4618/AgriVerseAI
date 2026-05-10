@@ -334,7 +334,7 @@ const LandingPage: React.FC<LandingPageProps> = (props) => {
                         </div>
                     </div>
                     <div className="mt-12 pt-8 border-t border-gray-800 text-center text-sm text-gray-500">
-                        <p>&copy; {new Date().getFullYear()} AgriVerseAI. All Rights Reserved. {texts.landing_version}</p>
+                        <p>&copy; {new Date().getFullYear()} AgriVerseAI. All Rights Reserved.</p>
                     </div>
                 </div>
             </footer>

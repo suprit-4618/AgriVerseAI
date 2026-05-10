@@ -1,5 +1,4 @@
-
-import { GoogleGenAI, Chat, Type, Part, Modality } from "@google/genai";
+import { GoogleGenerativeAI, Part, SchemaType, ChatSession } from "@google/generative-ai";
 import { GEMINI_MODEL_TEXT, GEMINI_MODEL_VISION } from '../constants';
 import { SoilData, SoilAnalysisReport, PlantAnalysisReport, MarketAnalysisReport, SoilImageAnalysisReport } from '../types';
 
@@ -9,11 +8,9 @@ if (!API_KEY) {
   console.error("VITE_GEMINI_API_KEY is not set in environment variables");
 }
 
-const ai = new GoogleGenAI({ 
-  apiKey: API_KEY || ""
-});
+const genAI = new GoogleGenerativeAI(API_KEY || "");
 
-export const createChatSession = (): Chat => {
+export const createChatSession = (): ChatSession => {
   if (!API_KEY) {
     throw new Error("API_KEY_MISSING");
   }
@@ -49,13 +46,12 @@ export const createChatSession = (): Chat => {
 
 Be the friend every farmer wishes they had - someone who listens, cares, and helps with a smile! 🌻`;
 
-  const chat = ai.chats.create({
+  const model = genAI.getGenerativeModel({
     model: GEMINI_MODEL_TEXT,
-    config: {
-      systemInstruction: systemInstruction,
-    },
+    systemInstruction: systemInstruction,
   });
-  return chat;
+
+  return model.startChat();
 };
 
 /**
@@ -83,31 +79,31 @@ export const getSoilAnalysis = async (data: SoilData, location: { district: stri
 - Rainfall: ${data.rainfall} mm`;
 
   const nutrientDetailSchema = {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
-      status: { type: Type.STRING, description: "The status of the nutrient (e.g., 'Optimal', 'Deficient')." },
-      analysis: { type: Type.STRING, description: "A concise analysis of this nutrient's level." },
+      status: { type: SchemaType.STRING, description: "The status of the nutrient (e.g., 'Optimal', 'Deficient')." },
+      analysis: { type: SchemaType.STRING, description: "A concise analysis of this nutrient's level." },
       idealRange: {
-        type: Type.ARRAY,
+        type: SchemaType.ARRAY,
         description: "The ideal numerical range [min, max] for this nutrient.",
-        items: { type: Type.NUMBER },
+        items: { type: SchemaType.NUMBER },
       },
     },
   };
 
   const responseSchema = {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
       soilHealthScore: {
-        type: Type.NUMBER,
+        type: SchemaType.NUMBER,
         description: "An overall soil health score from 0 to 100.",
       },
       soilHealthSummary: {
-        type: Type.STRING,
+        type: SchemaType.STRING,
         description: "A brief, overall summary of the soil's condition and health.",
       },
       nutrientAnalysis: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         description: "Detailed analysis for each key nutrient and pH level.",
         properties: {
 
@@ -115,15 +111,15 @@ export const getSoilAnalysis = async (data: SoilData, location: { district: stri
         },
       },
       recommendations: {
-        type: Type.ARRAY,
+        type: SchemaType.ARRAY,
         description: "A list of recommended crops.",
         items: {
-          type: Type.OBJECT,
+          type: SchemaType.OBJECT,
           properties: {
-            crop: { type: Type.STRING, description: "Name of the recommended crop." },
-            reason: { type: Type.STRING, description: "Why this crop is suitable for the given conditions and location." },
-            suitabilityScore: { type: Type.NUMBER, description: "A score from 0 to 100 indicating suitability." },
-            plantingTips: { type: Type.STRING, description: "Practical tips for planting or managing this crop." },
+            crop: { type: SchemaType.STRING, description: "Name of the recommended crop." },
+            reason: { type: SchemaType.STRING, description: "Why this crop is suitable for the given conditions and location." },
+            suitabilityScore: { type: SchemaType.NUMBER, description: "A score from 0 to 100 indicating suitability." },
+            plantingTips: { type: SchemaType.STRING, description: "Practical tips for planting or managing this crop." },
           },
         },
       },
@@ -131,18 +127,21 @@ export const getSoilAnalysis = async (data: SoilData, location: { district: stri
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL_TEXT,
-      contents: [{ parts: [{ text: promptText }] }],
-      config: {
-        systemInstruction: systemInstruction,
+      systemInstruction: systemInstruction,
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: promptText }] }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: responseSchema,
+        responseSchema: responseSchema as any,
         temperature: 0.5,
       },
     });
 
-    const jsonText = response.text.trim();
+    const jsonText = result.response.text().trim();
     return JSON.parse(jsonText) as SoilAnalysisReport;
 
   } catch (e) {
@@ -201,44 +200,44 @@ export const getPlantDiseaseAnalysis = async (base64Image: string, imageMimeType
       const prompt = `Generate a detailed report for ${pythonResult.disease_name} on ${pythonResult.crop}.`;
 
       const localizedTextSchema = {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          en: { type: Type.STRING },
-          kn: { type: Type.STRING }
+          en: { type: SchemaType.STRING },
+          kn: { type: SchemaType.STRING }
         },
         required: ["en", "kn"]
       };
 
       const localizedStringArraySchema = {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          en: { type: Type.ARRAY, items: { type: Type.STRING } },
-          kn: { type: Type.ARRAY, items: { type: Type.STRING } }
+          en: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          kn: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
         },
         required: ["en", "kn"]
       };
 
       const responseSchema = {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
           description: localizedTextSchema,
           symptoms: localizedStringArraySchema,
           prevention: localizedStringArraySchema,
           treatment: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
               medicineName: localizedTextSchema,
               usageInstructions: localizedStringArraySchema
             }
           },
-          affectedAreaPercentage: { type: Type.NUMBER },
+          affectedAreaPercentage: { type: SchemaType.NUMBER },
           riskFactors: {
-            type: Type.ARRAY,
+            type: SchemaType.ARRAY,
             items: {
-              type: Type.OBJECT,
+              type: SchemaType.OBJECT,
               properties: {
                 factor: localizedTextSchema,
-                value: { type: Type.NUMBER }
+                value: { type: SchemaType.NUMBER }
               }
             }
           }
@@ -317,58 +316,58 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
   ];
 
   const localizedTextSchema = {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
-      en: { type: Type.STRING },
-      kn: { type: Type.STRING }
+      en: { type: SchemaType.STRING },
+      kn: { type: SchemaType.STRING }
     },
     required: ["en", "kn"]
   };
 
   const localizedStringArraySchema = {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
-      en: { type: Type.ARRAY, items: { type: Type.STRING } },
-      kn: { type: Type.ARRAY, items: { type: Type.STRING } }
+      en: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+      kn: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
     },
     required: ["en", "kn"]
   };
 
   const responseSchema = {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
-      isDiseaseFound: { type: Type.BOOLEAN },
+      isDiseaseFound: { type: SchemaType.BOOLEAN },
       diseaseName: localizedTextSchema,
-      confidenceScore: { type: Type.NUMBER },
+      confidenceScore: { type: SchemaType.NUMBER },
       severity: localizedTextSchema,
       description: localizedTextSchema,
       symptoms: localizedStringArraySchema,
       prevention: localizedStringArraySchema,
       treatment: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
           medicineName: localizedTextSchema,
           usageInstructions: localizedStringArraySchema
         }
       },
       topDetections: {
-        type: Type.ARRAY,
+        type: SchemaType.ARRAY,
         items: {
-          type: Type.OBJECT,
+          type: SchemaType.OBJECT,
           properties: {
             disease: localizedTextSchema,
-            confidence: { type: Type.NUMBER }
+            confidence: { type: SchemaType.NUMBER }
           }
         }
       },
-      affectedAreaPercentage: { type: Type.NUMBER },
+      affectedAreaPercentage: { type: SchemaType.NUMBER },
       riskFactors: {
-        type: Type.ARRAY,
+        type: SchemaType.ARRAY,
         items: {
-          type: Type.OBJECT,
+          type: SchemaType.OBJECT,
           properties: {
             factor: localizedTextSchema,
-            value: { type: Type.NUMBER }
+            value: { type: SchemaType.NUMBER }
           }
         }
       }
@@ -376,24 +375,26 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL_VISION,
-      contents: [{ parts: contents }],
-      config: {
-        systemInstruction: systemInstruction,
+      systemInstruction: systemInstruction,
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: contents }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: responseSchema,
+        responseSchema: responseSchema as any,
         temperature: 0.3,
       },
     });
 
-    const jsonText = response.text.trim();
+    const jsonText = result.response.text().trim();
     return JSON.parse(jsonText) as PlantAnalysisReport;
 
   } catch (e) {
     console.error("Error in getPlantDiseaseAnalysis service:", e);
-    // Provide a more descriptive error message to help identify the root cause
-    const errorDetail = e instanceof Error ? e.message : "Unknown error";
+    const errorDetail = e instanceof Error ? e.message : JSON.stringify(e);
     throw new Error(`AI Analysis Failed: ${errorDetail}. Please check if the image is clear and contains a plant.`);
   }
 };
@@ -418,54 +419,57 @@ export const getMarketAnalysis = async (cropName: string, marketName: string): P
   const promptText = `Generate a market analysis report for ${cropName} in the ${marketName} market.`;
 
   const marketPriceSchema = {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
-      marketName: { type: Type.STRING },
-      minPrice: { type: Type.NUMBER },
-      maxPrice: { type: Type.NUMBER },
-      modalPrice: { type: Type.NUMBER },
+      marketName: { type: SchemaType.STRING },
+      minPrice: { type: SchemaType.NUMBER },
+      maxPrice: { type: SchemaType.NUMBER },
+      modalPrice: { type: SchemaType.NUMBER },
     },
     required: ["marketName", "minPrice", "maxPrice", "modalPrice"]
   };
 
   const responseSchema = {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
-      cropName: { type: Type.STRING },
+      cropName: { type: SchemaType.STRING },
       homeMarket: marketPriceSchema,
       priceTrend: {
-        type: Type.ARRAY,
+        type: SchemaType.ARRAY,
         items: {
-          type: Type.OBJECT,
+          type: SchemaType.OBJECT,
           properties: {
-            date: { type: Type.STRING },
-            price: { type: Type.NUMBER },
+            date: { type: SchemaType.STRING },
+            price: { type: SchemaType.NUMBER },
           },
           required: ["date", "price"]
         }
       },
       comparisonMarkets: {
-        type: Type.ARRAY,
+        type: SchemaType.ARRAY,
         items: marketPriceSchema
       },
-      marketInsight: { type: Type.STRING }
+      marketInsight: { type: SchemaType.STRING }
     },
     required: ["cropName", "homeMarket", "priceTrend", "comparisonMarkets", "marketInsight"]
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL_TEXT,
-      contents: [{ parts: [{ text: promptText }] }],
-      config: {
-        systemInstruction: systemInstruction,
+      systemInstruction: systemInstruction,
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: promptText }] }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema,
+        responseSchema: responseSchema as any,
         temperature: 0.7,
       },
     });
 
-    const jsonText = response.text.trim();
+    const jsonText = result.response.text().trim();
     return JSON.parse(jsonText) as MarketAnalysisReport;
 
   } catch (e) {
@@ -507,66 +511,69 @@ export const getSoilAnalysisFromImage = async (base64Image: string, imageMimeTyp
   ];
 
   const responseSchema = {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
       soilColor: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          colorName: { type: Type.STRING },
-          interpretation: { type: Type.STRING },
+          colorName: { type: SchemaType.STRING },
+          interpretation: { type: SchemaType.STRING },
         },
       },
       visualTexture: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          dominantType: { type: Type.STRING, enum: ['Sandy', 'Loamy', 'Clay', 'Silty', 'Mixed'] },
-          confidence: { type: Type.NUMBER },
-          description: { type: Type.STRING },
+          dominantType: { type: SchemaType.STRING, enum: ['Sandy', 'Loamy', 'Clay', 'Silty', 'Mixed'] },
+          confidence: { type: SchemaType.NUMBER },
+          description: { type: SchemaType.STRING },
         },
       },
       moistureLevel: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          level: { type: Type.STRING, enum: ['Dry', 'Moist', 'Wet'] },
-          confidence: { type: Type.NUMBER },
-          description: { type: Type.STRING },
+          level: { type: SchemaType.STRING, enum: ['Dry', 'Moist', 'Wet'] },
+          confidence: { type: SchemaType.NUMBER },
+          description: { type: SchemaType.STRING },
         },
       },
       organicMatterEstimate: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          level: { type: Type.STRING, enum: ['Low', 'Medium', 'High'] },
-          description: { type: Type.STRING },
+          level: { type: SchemaType.STRING, enum: ['Low', 'Medium', 'High'] },
+          description: { type: SchemaType.STRING },
         },
       },
       surfaceFeatures: {
-        type: Type.ARRAY,
+        type: SchemaType.ARRAY,
         items: {
-          type: Type.OBJECT,
+          type: SchemaType.OBJECT,
           properties: {
-            feature: { type: Type.STRING },
-            description: { type: Type.STRING },
+            feature: { type: SchemaType.STRING },
+            description: { type: SchemaType.STRING },
           },
         },
       },
-      overallAssessment: { type: Type.STRING },
-      limitations: { type: Type.ARRAY, items: { type: Type.STRING } },
+      overallAssessment: { type: SchemaType.STRING },
+      limitations: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
     },
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL_VISION,
-      contents: [{ parts: contents }],
-      config: {
-        systemInstruction: systemInstruction,
+      systemInstruction: systemInstruction,
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: contents }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema,
+        responseSchema: responseSchema as any,
         temperature: 0.4,
       },
     });
 
-    const jsonText = response.text.trim();
+    const jsonText = result.response.text().trim();
     return JSON.parse(jsonText) as SoilImageAnalysisReport;
 
   } catch (e) {
@@ -605,26 +612,31 @@ export const getPriceEstimate = async (
     Weather Context: ${weatherSummary}`;
 
   const responseSchema = {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
-      min: { type: Type.NUMBER },
-      max: { type: Type.NUMBER }
+      min: { type: SchemaType.NUMBER },
+      max: { type: SchemaType.NUMBER }
     },
     required: ["min", "max"]
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL_TEXT,
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction: systemInstruction,
+      systemInstruction: systemInstruction,
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema,
+        responseSchema: responseSchema as any,
         temperature: 0.2,
       },
     });
-    return JSON.parse(response.text.trim());
+
+    return JSON.parse(result.response.text().trim());
+
   } catch (e) {
     console.error("Error in getPriceEstimate:", e);
     // Fallback estimate
@@ -644,22 +656,23 @@ export const generateSpeech = async (text: string): Promise<string | undefined> 
   }
 
   try {
-    const response = await ai.models.generateContent({
+    const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL_TEXT,
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO], // Must be an array with a single `Modality.AUDIO` element.
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text }] }],
+      generationConfig: {
+        responseModalities: ["AUDIO"],
         speechConfig: {
           voiceConfig: {
-            // Using 'Kore' as it provides a clear, neutral voice often suitable for assistants.
             prebuiltVoiceConfig: { voiceName: 'Kore' },
           },
         },
       },
     });
 
-    // Return the base64 audio data directly from the response
-    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    return result.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   } catch (e) {
     console.error("Error generating speech:", e);
     return undefined;
