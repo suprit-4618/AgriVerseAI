@@ -51,9 +51,13 @@ A direct-to-buyer platform that eliminates middlemen.
 
 ### Backend
 - **Engine:** FastAPI (Python 3.10+)
-- **AI/ML:** TensorFlow 2.x + Keras
+- **AI/ML:** TensorFlow 2.x + Keras — **MobileNetV2 fine-tuned CNN** (`app/backend/`)
 - **Computer Vision:** OpenCV + Pillow
 - **Database:** Firebase Cloud Firestore
+
+> **Note on language stats:** GitHub reports ~87% TypeScript because of the React 19 frontend.
+> The Python ML pipeline — MobileNetV2 fine-tuning, TensorFlow inference, and the FastAPI serving layer — lives entirely in [`app/backend/`](app/backend/).
+> That is where the model training, CUDA acceleration, and low-latency inference code reside.
 
 ---
 

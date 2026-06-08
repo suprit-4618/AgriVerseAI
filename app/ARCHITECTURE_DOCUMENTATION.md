@@ -23,7 +23,7 @@ flowchart TB
         Vite["Vite Dev Server"]
     end
     
-    subgraph "AI Services"
+    subgraph "AI Services"V
         Gemini["Google Gemini API"]
         PyML["Python ML API"]
     end
