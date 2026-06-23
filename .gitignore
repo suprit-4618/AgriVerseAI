@@ -42,3 +42,5 @@ dist/
 build/
 .cache/
 app/backend/dataset_config.txt
+bhoomi_rebuild_directive.md
+bhoomi_system_prompt.md
