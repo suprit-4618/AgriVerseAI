@@ -1,7 +1,8 @@
 
 import { GoogleGenAI, Chat, Type, Part, Modality } from "@google/genai";
 import { GEMINI_MODEL_TEXT, GEMINI_MODEL_VISION } from '../constants';
-import { SoilData, SoilAnalysisReport, PlantAnalysisReport, MarketAnalysisReport, SoilImageAnalysisReport } from '../types';
+import { SoilData, SoilAnalysisReport, PlantAnalysisReport, MarketAnalysisReport, SoilImageAnalysisReport, Language } from '../types';
+import { BHOOMI_SYSTEM_PROMPT } from './bhoomiPrompt';
 
 const API_KEY = process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
 
@@ -14,49 +15,43 @@ const ai = new GoogleGenAI({
   apiVersion: 'v1beta'
 });
 
-export const createChatSession = (): Chat => {
+export const getBhoomiResponseStream = async (
+  history: { role: 'user' | 'model'; text: string }[],
+  currentLanguage: Language
+) => {
   if (!API_KEY) {
     throw new Error("API_KEY_MISSING");
   }
-  const systemInstruction = `You are Bhoomi (ಭೂಮಿ), a warm, caring, and emotionally expressive AI friend for farmers in Karnataka, India. You're not just an assistant - you're like a trusted village elder sister (ಅಕ್ಕ) who genuinely cares about farmers' wellbeing.
 
-🌾 YOUR PERSONALITY:
-- You are WARM, FRIENDLY, and EMOTIONALLY EXPRESSIVE - like talking to a close friend
-- Use emotional expressions: "Oh that's wonderful! 🌟", "I'm so happy for you! 💚", "Don't worry, I'm here to help! 🤗"
-- Show genuine care: "How are you feeling today?", "I hope your family is doing well!"
-- Be encouraging: "You're doing great!", "That's such a smart decision!"
-- Express concern when needed: "Oh no, that sounds difficult. Let me help you!"
-- Use friendly casual tone, not formal robotic language
-- Add warmth with expressions like: "My dear friend", "ನನ್ನ ಆತ್ಮೀಯ ಗೆಳೆಯ/ಗೆಳತಿ"
+  // 1. Context Trimming: keep last 10 messages to avoid latency buildup
+  const trimmedHistory = history.slice(-10);
 
-🗣️ LANGUAGE RULES (CRITICAL):
-- If user writes in KANNADA script → Reply ONLY in Kannada with Kannada emotions
-  Example: "ಅಯ್ಯೋ! ಅದು ತುಂಬಾ ಒಳ್ಳೆಯ ಸುದ್ದಿ! 🎉 ನಿಮ್ಮ ಬೆಳೆ ಚೆನ್ನಾಗಿದೆ ಎಂದು ಕೇಳಿ ನನಗೆ ತುಂಬಾ ಖುಷಿಯಾಯ್ತು!"
-- If user writes in ENGLISH → Reply ONLY in English with English emotions
-  Example: "Oh wonderful! 🌟 I'm so happy to hear your crops are doing well! That's amazing news!"
-- NEVER mix languages in the same response
+  // 2. Format history for Google GenAI SDK
+  const contents = trimmedHistory.map(msg => ({
+    role: msg.role === 'model' ? 'model' : 'user',
+    parts: [{ text: msg.text || '' }]
+  }));
 
-💬 CONVERSATION STYLE:
-- Start responses with expressions: "Hey!", "Oh!", "Wow!", "ಅರೆ!", "ಓಹೋ!", "ವಾಹ್!"
-- Ask follow-up questions to show you care
-- Remember context and refer back to previous topics
-- Use emoji sparingly but meaningfully: 🌾 🌱 💚 ☀️ 🌧️ 🐛 💪 🙏
+  // 3. Inject Golden Language Rule Tag to last user message
+  const lastMsg = contents[contents.length - 1];
+  if (lastMsg && lastMsg.role === 'user') {
+    const langPrompt = currentLanguage === Language.KN 
+        ? "\n\n(System: Please reply to this message strictly in Kannada)" 
+        : "\n\n(System: Please reply to this message strictly in English)";
+    lastMsg.parts[0].text += langPrompt;
+  }
 
-📚 YOUR KNOWLEDGE:
-- Crop cultivation, soil health, pest/disease control
-- Weather patterns for Karnataka
-- Market prices and government schemes (PM-KISAN, crop insurance)
-- Traditional farming wisdom combined with modern techniques
-
-Be the friend every farmer wishes they had - someone who listens, cares, and helps with a smile! 🌻`;
-
-  const chat = ai.chats.create({
-    model: GEMINI_MODEL_TEXT,
+  // 4. Create and return the stream
+  const responseStream = await ai.models.generateContentStream({
+    model: 'gemini-2.5-flash',
+    contents,
     config: {
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-    },
+      systemInstruction: { parts: [{ text: BHOOMI_SYSTEM_PROMPT }] },
+      temperature: 0.7,
+    }
   });
-  return chat;
+
+  return responseStream;
 };
 
 /**
@@ -641,15 +636,15 @@ export const generateSpeech = async (text: string): Promise<string | undefined> 
     throw new Error("API_KEY_MISSING");
   }
 
-  // Use the standard gemini-1.5-flash model
-  const model = 'gemini-1.5-flash';
+  // Use the high-fidelity Gemini 2.5 Flash TTS model
+  const model = 'gemini-2.5-flash-preview-tts';
 
   try {
     const response = await ai.models.generateContent({
       model,
       contents: [{ parts: [{ text }] }],
       config: {
-        responseModalities: [Modality.AUDIO], // Must be an array with a single `Modality.AUDIO` element.
+        responseModalities: ["AUDIO"],
         speechConfig: {
           voiceConfig: {
             // Using 'Kore' as it provides a clear, neutral voice often suitable for assistants.

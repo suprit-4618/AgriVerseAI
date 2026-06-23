@@ -1,6 +1,9 @@
 """
 FastAPI server for plant disease prediction
 """
+import os
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel

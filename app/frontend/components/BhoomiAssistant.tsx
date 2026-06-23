@@ -4,8 +4,7 @@ import { Language, UserProfile, UIStringContent, ChatMessage } from '../types';
 import { uiStrings } from '../constants';
 import Button from './common/Button';
 import LoadingSpinner from './common/LoadingSpinner';
-import { getPlantDiseaseAnalysis } from '../services/geminiService';
-import { sendMessageToGroq } from '../services/groqService';
+import { getPlantDiseaseAnalysis, generateSpeech, getBhoomiResponseStream } from '../services/geminiService';
 import {
     ArrowLeftIcon, PaperClipIcon, XCircleIcon, MicrophoneIcon, PaperAirplaneIcon, SparklesIcon,
     SpeakerWaveIcon, SpeakerXMarkIcon, UserCircleIcon
@@ -15,9 +14,9 @@ import GeneratingAnimation from './common/GeneratingAnimation';
 import MarkdownRenderer from './common/MarkdownRenderer';
 import LanguageToggle from './common/LanguageToggle';
 import PlantAnalysisResult from './PlantAnalysisResult';
-import './BhoomiGalaxyTheme.css'; // Import the new theme
+import './BhoomiGalaxyTheme.css';
 
-// Global declarations
+// Global declarations for Web Speech and Web Audio APIs
 declare global {
     interface Window {
         SpeechRecognition: any;
@@ -45,11 +44,30 @@ const removeMarkdown = (text: string): string => {
     return text
         .replace(/\*\*(.*?)\*\*/g, '$1')
         .replace(/\*(.*?)\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
         .replace(/^\s*[\-\*]\s/gm, '')
         .replace(/^\s*\d+\.\s/gm, '')
         .replace(/^#+\s/gm, '');
 };
 
+const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+    const binaryString = window.atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+};
+
+const convertPCM16ToFloat32 = (pcmData: ArrayBuffer): Float32Array => {
+    const int16Array = new Int16Array(pcmData);
+    const float32Array = new Float32Array(int16Array.length);
+    for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768.0;
+    }
+    return float32Array;
+};
 
 // Speech Recognition Hook
 const useSpeechRecognition = (onResult: (t: string) => void, onEnd: () => void, onError: (e: string) => void, lang: Language) => {
@@ -67,41 +85,6 @@ const useSpeechRecognition = (onResult: (t: string) => void, onEnd: () => void, 
     }, [lang, onResult, onEnd, onError]);
     return { startRecognition: useCallback(() => { if (recRef.current) { try { recRef.current.start(); } catch (e) { console.error(e); onEnd(); } } }, [onEnd]) };
 };
-
-// Component to render the Gemini-like typing effect with FASTER speed
-const TypingEffect: React.FC<{ text: string; language: Language }> = ({ text, language }) => {
-    const [displayedText, setDisplayedText] = useState('');
-    const charsPerFrame = 3; // Show 3 characters per frame for faster typing
-
-    useEffect(() => {
-        if (displayedText.length < text.length) {
-            const timer = setTimeout(() => {
-                // Add multiple characters per frame for faster typing
-                const nextLength = Math.min(displayedText.length + charsPerFrame, text.length);
-                setDisplayedText(text.substring(0, nextLength));
-            }, 10); // Ultra-fast: 10ms per 3 characters = ~300 chars/sec
-            return () => clearTimeout(timer);
-        }
-    }, [text, displayedText]);
-
-    // Safeguard to reset if the parent component sends an empty text
-    useEffect(() => {
-        if (text === '') {
-            setDisplayedText('');
-        }
-    }, [text]);
-
-    const showCursor = displayedText.length === text.length;
-    const isEmpty = displayedText.length === 0;
-
-    return (
-        <p className={`whitespace-pre-wrap text-sm md:text-base leading-relaxed ${language === Language.KN ? 'font-kannada' : ''} ${showCursor ? '' : 'typing-cursor-animated'}`}>
-            {displayedText}
-            {isEmpty && showCursor && '\u00A0'}
-        </p>
-    );
-};
-
 
 interface BhoomiAssistantProps {
     user: UserProfile;
@@ -145,7 +128,6 @@ const ListeningView: React.FC<{ texts: UIStringContent; speechError: string | nu
     );
 };
 
-
 // Assistant Home Screen
 const AssistantHomeScreen: React.FC<{
     user: UserProfile; texts: UIStringContent; currentLanguage: Language;
@@ -163,7 +145,7 @@ const AssistantHomeScreen: React.FC<{
     useEffect(() => {
         const interval = setInterval(() => {
             setFactIndex((prevIndex) => (prevIndex + 1) % (texts.agriculturalFacts.length || 1));
-        }, 5000); // Change fact every 5 seconds
+        }, 5000);
         return () => clearInterval(interval);
     }, [texts.agriculturalFacts.length]);
 
@@ -368,7 +350,6 @@ const ChatScreen: React.FC<{
                     <AnimatePresence>
                         {history.map((msg, index) => {
                             const isLastMessage = index === history.length - 1;
-                            const isStreaming = isLastMessage && isLoading && msg.role === 'model' && !msg.analysisReport;
                             const isCurrentlySpeaking = isLastMessage && msg.role === 'model' && isSpeaking;
 
                             return (
@@ -409,11 +390,7 @@ const ChatScreen: React.FC<{
 
                                             {/* MODEL RESPONSE: TEXT */}
                                             {msg.role === 'model' && !msg.analysisReport && msg.text && (
-                                                isStreaming ? (
-                                                    <TypingEffect text={msg.text} language={currentLanguage} />
-                                                ) : (
-                                                    <MarkdownRenderer content={msg.text} language={currentLanguage} />
-                                                )
+                                                <MarkdownRenderer content={msg.text} language={currentLanguage} />
                                             )}
 
                                             {/* USER MESSAGE */}
@@ -504,6 +481,13 @@ const ChatScreen: React.FC<{
     );
 };
 
+interface TTSPlaylistItem {
+    index: number;
+    text: string;
+    base64Data?: string;
+    status: 'pending' | 'resolved' | 'failed';
+}
+
 // Bhoomi AI Assistant Main Component
 const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     const { currentLanguage, user, setCurrentLanguage } = props;
@@ -517,170 +501,149 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     const [speechError, setSpeechError] = useState<string | null>(null);
     const isSendingRef = useRef(false);
 
-    // ============ HIGH QUALITY CLOUD TTS ============
-    const speechQueueRef = useRef<string[]>([]);
-    const isProcessingQueueRef = useRef(false);
-    const currentAudioRef = useRef<HTMLAudioElement | null>(null);
-    const speechSessionIdRef = useRef(0);
+    // ============ WEB AUDIO API & STREAMING TTS PIPELINE ============
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const activeSourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+    const playlistRef = useRef<TTSPlaylistItem[]>([]);
+    const nextPlayIndexRef = useRef<number>(0);
+    const isPlayingAudioRef = useRef<boolean>(false);
+    const currentSessionIdRef = useRef<number>(0);
 
+    // Initial load/cleanup
     useEffect(() => {
         setHistory([]);
-
-        // Preload browser voices
-        if (window.speechSynthesis) {
-            window.speechSynthesis.getVoices();
-            window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-        }
-
-        return () => handleCancelSpeak();
-    }, []); // Removed currentLanguage to prevent chat clearing on language toggle
-
-    const handleCancelSpeak = useCallback(() => {
-        console.log("Cancelling speech and incrementing session ID");
-        speechSessionIdRef.current += 1;
-        speechQueueRef.current = [];
-        isProcessingQueueRef.current = false;
-        
-        if (currentAudioRef.current) {
-            currentAudioRef.current.pause();
-            currentAudioRef.current.src = ""; // Force stop and clear buffer
-            currentAudioRef.current = null;
-        }
-        
-        if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-        }
-        setIsSpeaking(false);
+        return () => {
+            handleCancelSpeak();
+            if (audioContextRef.current) {
+                audioContextRef.current.close().catch(err => console.error("Error closing AudioContext:", err));
+                audioContextRef.current = null;
+            }
+        };
     }, []);
 
-    const fallbackToBrowserTTS = (plainText: string) => {
-        const sessionIdAtStart = speechSessionIdRef.current;
-        
-        if (!window.speechSynthesis) {
-            isProcessingQueueRef.current = false;
-            processSpeechQueue();
-            return;
+    // Get or initialize AudioContext
+    const getAudioContext = (): AudioContext => {
+        if (!audioContextRef.current) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            audioContextRef.current = new AudioContextClass();
         }
-
-        const utterance = new SpeechSynthesisUtterance(plainText);
-        const voices = window.speechSynthesis.getVoices();
-        
-        let voice = voices.find(v => v.name.includes('Google') && v.lang.includes('IN'));
-        if (!voice) voice = voices.find(v => v.lang.includes('IN') && v.name.toLowerCase().includes('female'));
-        if (!voice) voice = voices.find(v => v.lang.includes('IN'));
-        
-        if (!voice) {
-            const langCode = currentLanguage === Language.KN ? 'kn' : 'en';
-            voice = voices.find(v => v.lang.startsWith(langCode));
+        if (audioContextRef.current.state === 'suspended') {
+            audioContextRef.current.resume();
         }
-        if (!voice) voice = voices.find(v => v.lang.startsWith('en'));
-
-        if (voice) utterance.voice = voice;
-
-        utterance.rate = 1.0; // Reset to natural speed
-        utterance.pitch = 1.0; 
-        utterance.volume = 1.0;
-        utterance.lang = currentLanguage === Language.KN ? 'kn-IN' : 'en-US';
-
-        utterance.onend = () => {
-            if (speechSessionIdRef.current !== sessionIdAtStart) {
-                console.log("Ignoring onend for stale session");
-                return;
-            }
-            isProcessingQueueRef.current = false;
-            processSpeechQueue();
-        };
-
-        utterance.onerror = (e) => {
-            console.error("Browser TTS Error:", e);
-            if (speechSessionIdRef.current !== sessionIdAtStart) return;
-            isProcessingQueueRef.current = false;
-            processSpeechQueue();
-        };
-
-        window.speechSynthesis.speak(utterance);
+        return audioContextRef.current;
     };
 
-    const processSpeechQueue = useCallback(async () => {
-        if (isProcessingQueueRef.current || speechQueueRef.current.length === 0) {
-            if (speechQueueRef.current.length === 0) setIsSpeaking(false);
+    // Stop speaking, clear state and increment session ID to invalidate pending TTS requests
+    const handleCancelSpeak = useCallback(() => {
+        console.log("Cancelling speech playback and invalidating current session ID");
+        currentSessionIdRef.current += 1;
+        playlistRef.current = [];
+        nextPlayIndexRef.current = 0;
+        isPlayingAudioRef.current = false;
+        setIsSpeaking(false);
+
+        if (activeSourceNodeRef.current) {
+            try {
+                activeSourceNodeRef.current.stop();
+            } catch (e) {
+                // Ignore if already stopped
+            }
+            activeSourceNodeRef.current = null;
+        }
+    }, []);
+
+    // Play next item in the playlist
+    const processPlaylist = useCallback((sessionId: number) => {
+        if (currentSessionIdRef.current !== sessionId) return;
+        if (isPlayingAudioRef.current) return;
+
+        const nextItem = playlistRef.current.find(p => p.index === nextPlayIndexRef.current);
+        if (!nextItem) {
+            // Check if all items in playlist are completed, if so set isSpeaking to false
+            const allCompleted = playlistRef.current.every(p => p.status === 'resolved' || p.status === 'failed');
+            if (allCompleted && playlistRef.current.length > 0) {
+                setIsSpeaking(false);
+            }
             return;
         }
 
-        isProcessingQueueRef.current = true;
+        if (nextItem.status === 'resolved' && nextItem.base64Data) {
+            nextPlayIndexRef.current++;
+            playPCM(nextItem.base64Data, nextItem.text, sessionId);
+        } else if (nextItem.status === 'failed') {
+            nextPlayIndexRef.current++;
+            // Try playing the next one asynchronously
+            setTimeout(() => processPlaylist(sessionId), 0);
+        }
+        // If pending, we just wait until the async fetch updates the playlist status
+    }, []);
+
+    // Core play PCM via AudioContext
+    const playPCM = (base64Data: string, text: string, sessionId: number) => {
+        isPlayingAudioRef.current = true;
         setIsSpeaking(true);
 
-        const textToSpeak = speechQueueRef.current.shift();
-        if (!textToSpeak) {
-            isProcessingQueueRef.current = false;
-            setIsSpeaking(false);
-            processSpeechQueue();
-            return;
-        }
-
-        // Strip markdown and emojis before speaking
-        const plainText = removeMarkdown(textToSpeak)
-            .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
-            .trim();
-            
-        if (!plainText) {
-            isProcessingQueueRef.current = false;
-            processSpeechQueue();
-            return;
-        }
-
         try {
-            const sessionIdAtStart = speechSessionIdRef.current;
-            console.log(`Processing speech queue. Session: ${sessionIdAtStart}, Text: ${plainText.substring(0, 30)}...`);
+            const audioCtx = getAudioContext();
+            const arrayBuffer = base64ToArrayBuffer(base64Data);
+            const float32Data = convertPCM16ToFloat32(arrayBuffer);
 
-            // Use Google Translate's Neural TTS endpoint for a highly realistic human voice
-            const tl = currentLanguage === Language.KN ? 'kn' : 'en-IN'; 
-            const encodedText = encodeURIComponent(plainText.substring(0, 195)); 
-            const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=${tl}&client=tw-ob`;
-            
-            const audio = new Audio(audioUrl);
-            currentAudioRef.current = audio;
-            
-            audio.onended = () => {
-                if (speechSessionIdRef.current !== sessionIdAtStart) {
-                    console.log("Ignoring onended for stale session");
-                    return;
-                }
-                currentAudioRef.current = null;
-                isProcessingQueueRef.current = false;
-                processSpeechQueue();
+            const audioBuffer = audioCtx.createBuffer(1, float32Data.length, 24000);
+            audioBuffer.copyToChannel(float32Data, 0);
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioCtx.destination);
+            activeSourceNodeRef.current = source;
+
+            source.onended = () => {
+                if (currentSessionIdRef.current !== sessionId) return;
+                activeSourceNodeRef.current = null;
+                isPlayingAudioRef.current = false;
+                processPlaylist(sessionId);
             };
-            
-            audio.onerror = () => {
-                if (speechSessionIdRef.current !== sessionIdAtStart) return;
-                console.error("Audio playback error, falling back to native TTS");
-                audio.pause();
-                audio.src = "";
-                currentAudioRef.current = null;
-                isProcessingQueueRef.current = false;
-                fallbackToBrowserTTS(plainText);
-            };
-            
-            audio.play().catch(e => {
-                if (speechSessionIdRef.current !== sessionIdAtStart) return;
-                console.error("Audio play failed, falling back to native TTS:", e);
-                audio.pause();
-                audio.src = "";
-                currentAudioRef.current = null;
-                isProcessingQueueRef.current = false;
-                fallbackToBrowserTTS(plainText);
-            });
-        } catch (e) {
-            console.error("TTS API Error:", e);
-            fallbackToBrowserTTS(plainText);
+
+            source.start(0);
+        } catch (err) {
+            console.error("Playback error:", err);
+            isPlayingAudioRef.current = false;
+            processPlaylist(sessionId);
         }
-    }, [currentLanguage]);
+    };
 
+    // Async fetch TTS chunk and update playlist
+    const fetchSpeech = async (text: string, index: number, sessionId: number) => {
+        try {
+            console.log(`[TTS Fetch] Dispatched index: ${index}, text: "${text.substring(0, 30)}..."`);
+            const base64 = await generateSpeech(text);
+            if (currentSessionIdRef.current !== sessionId) return;
+
+            const entry = playlistRef.current.find(p => p.index === index);
+            if (entry) {
+                entry.base64Data = base64;
+                entry.status = base64 ? 'resolved' : 'failed';
+            }
+            processPlaylist(sessionId);
+        } catch (err) {
+            console.error(`[TTS Fetch Error] Index: ${index}`, err);
+            if (currentSessionIdRef.current !== sessionId) return;
+
+            const entry = playlistRef.current.find(p => p.index === index);
+            if (entry) {
+                entry.status = 'failed';
+            }
+            processPlaylist(sessionId);
+        }
+    };
+
+    // Single-shot queue speech (for disease detection summary)
     const queueSpeech = useCallback((text: string) => {
         if (!text || !text.trim()) return;
-        speechQueueRef.current.push(text);
-        processSpeechQueue();
-    }, [processSpeechQueue]);
+        const sessionId = currentSessionIdRef.current;
+        const idx = playlistRef.current.length;
+        playlistRef.current.push({ index: idx, text, status: 'pending' });
+        fetchSpeech(text, idx, sessionId);
+    }, []);
 
     const handleSpeechError = (error: string) => {
         let message = texts.errorSpeechGeneric;
@@ -691,9 +654,9 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
 
     const handleSendMessage = useCallback(async (message: string, attachment: File | null) => {
         if (isSendingRef.current || isLoading) return;
-        
+
         isSendingRef.current = true;
-        handleCancelSpeak(); // Clear previous speech
+        handleCancelSpeak(); // Clear previous speech & reset session
         setCurrentView('chat');
         setIsLoading(true);
 
@@ -727,80 +690,81 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
             return;
         }
 
-        // Standard text-based chat with Groq Streaming TTS
+        // Standard text-based chat with Gemini Streaming and Sentence TTS Pipelining
         try {
-            // Append a hidden system instruction to ensure the AI replies in the selected language
-            const langPrompt = currentLanguage === Language.KN 
-                ? "\n\n(System: Please reply to this message strictly in Kannada script.)" 
-                : "\n\n(System: Please reply to this message strictly in English.)";
-                
-            const groqMessages = history.map(msg => ({
-                role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.text || ''
-            }));
-            groqMessages.push({ role: 'user', content: message + langPrompt });
-
-            const stream = await sendMessageToGroq(groqMessages);
-            if (!stream) throw new Error("No response stream from Groq");
-
-            let fullResponse = '';
-            let chunkBuffer = '';
             const modelMessageId = `model-${Date.now()}`;
             setHistory(prev => [...prev, { id: modelMessageId, role: 'model', text: '' }]);
 
-            const sessionIdAtStreamStart = speechSessionIdRef.current;
-            const reader = stream.getReader();
-            const decoder = new TextDecoder();
+            // Initialize/unlock audio context on user interaction (since they clicked the button)
+            if (isVoiceEnabled) {
+                try {
+                    getAudioContext();
+                } catch (e) {
+                    console.warn("Failed to unlock AudioContext:", e);
+                }
+            }
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                if (speechSessionIdRef.current !== sessionIdAtStreamStart) break;
+            const responseStream = await getBhoomiResponseStream(
+                [...history, userMessage],
+                currentLanguage
+            );
 
-                const text = decoder.decode(value);
-                const lines = text.split('\n');
+            let fullResponse = '';
+            let chunkBuffer = '';
+            let sentenceIndex = 0;
+            const sessionIdAtStreamStart = currentSessionIdRef.current;
 
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
-                        if (data === '[DONE]') break;
-                        try {
-                            const json = JSON.parse(data);
-                            const delta = json.choices[0].delta?.content || '';
-                            if (delta) {
-                                fullResponse += delta;
-                                chunkBuffer += delta;
+            for await (const chunk of responseStream) {
+                if (currentSessionIdRef.current !== sessionIdAtStreamStart) break;
 
-                                // Update UI
-                                setHistory(prev => prev.map(m => m.id === modelMessageId ? { ...m, text: fullResponse } : m));
+                const text = chunk.text;
+                if (text) {
+                    fullResponse += text;
+                    chunkBuffer += text;
 
-                                // Stream to TTS logic
-                                if (isVoiceEnabled) {
-                                    const punctuation = ['.', '?', '!', '\n', '।', ':', ';'];
-                                    if (punctuation.some(p => chunkBuffer.includes(p)) || chunkBuffer.length > 60) {
-                                        const sentences = chunkBuffer.split(/([.?!।\n:;])/);
-                                        while (sentences.length > 2) {
-                                            const sentence = sentences.shift()! + sentences.shift()!;
-                                            if (sentence.trim()) queueSpeech(sentence.trim());
-                                        }
-                                        chunkBuffer = sentences.join('');
+                    // Update UI immediately (streaming response)
+                    setHistory(prev => prev.map(m => m.id === modelMessageId ? { ...m, text: fullResponse } : m));
+
+                    if (isVoiceEnabled) {
+                        // Regex matches periods, question marks, exclamation marks, Kannada danda, or newlines.
+                        const delimiters = /[.?!।\n]/;
+                        if (delimiters.test(chunkBuffer)) {
+                            const parts = chunkBuffer.split(/([.?!।\n])/);
+                            while (parts.length > 2) {
+                                const sentenceText = (parts.shift() || '') + (parts.shift() || '');
+                                const trimmed = sentenceText.trim();
+                                if (trimmed && trimmed.length > 1) {
+                                    const plainSentence = removeMarkdown(trimmed)
+                                        .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
+                                        .trim();
+                                    
+                                    if (plainSentence) {
+                                        const idx = sentenceIndex++;
+                                        playlistRef.current.push({ index: idx, text: plainSentence, status: 'pending' });
+                                        fetchSpeech(plainSentence, idx, sessionIdAtStreamStart);
                                     }
                                 }
                             }
-                        } catch (e) {
-                            // Incomplete JSON chunk, skip
+                            chunkBuffer = parts.join('');
                         }
                     }
                 }
             }
 
-            // Flush remaining buffer
-            if (isVoiceEnabled && chunkBuffer.trim() && speechSessionIdRef.current === sessionIdAtStreamStart) {
-                queueSpeech(chunkBuffer.trim());
+            // Flush remaining buffer after stream finishes
+            if (isVoiceEnabled && chunkBuffer.trim() && currentSessionIdRef.current === sessionIdAtStreamStart) {
+                const plainSentence = removeMarkdown(chunkBuffer)
+                    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
+                    .trim();
+                if (plainSentence) {
+                    const idx = sentenceIndex++;
+                    playlistRef.current.push({ index: idx, text: plainSentence, status: 'pending' });
+                    fetchSpeech(plainSentence, idx, sessionIdAtStreamStart);
+                }
             }
 
         } catch (e: any) {
-            console.error("Groq Chat Error:", e);
+            console.error("Gemini Streaming Error:", e);
             setHistory(prev => [...prev, { id: `model-err-${Date.now()}`, role: 'model', text: `${texts.errorPrefix} ${e.message}` }]);
         } finally {
             setIsLoading(false);
