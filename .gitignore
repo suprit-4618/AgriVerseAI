@@ -1,46 +1,58 @@
-# Environment Variables
+﻿# Environment Variables & Secrets
 .env
-.env.local
-.env.production
+.env.*
+*.env
 backend/.env
+backend/.env.*
 frontend/.env
+frontend/.env.*
+app/backend/.env
+app/backend/.env.*
+app/frontend/.env
+app/frontend/.env.*
+**/.env*
 
-# Dependencies
+# Service Account Keys & Secrets
+serviceAccountKey*.json
+**/serviceAccountKey*.json
+*.pem
+*.key
+*.cert
+*.pfx
+
+# SQLite & Databases
+*.db
+*.sqlite
+*.sqlite3
+**/tokens.db
+app/backend/tokens.db
+
+# Dependencies & Virtualenvs
 node_modules/
-app/frontend/node_modules/
+**/node_modules/
 venv/
 env/
 .venv/
 __pycache__/
 *.py[cod]
 
-# Secrets and Keys
-serviceAccountKey.json
-backend/serviceAccountKey.json
-*.pem
-*.key
-
-# IDE Metadata
-.vscode/
-.idea/
-.DS_Store
-
 # Large Data and Models
 backend/models/*.h5
-# Un-comment the line below if you don't want to push the 17MB model file
-# backend/models/plant_disease_model.h5
+app/backend/models/*.h5
 
-# OS Files
-Thumbs.db
-desktop.ini
-
-*.db
-app/backend/tokens.db
-
-
+# Build & Logs
 dist/
 build/
 .cache/
+logs/
+*.log
 app/backend/dataset_config.txt
 bhoomi_rebuild_directive.md
 bhoomi_system_prompt.md
+
+# OS & IDE Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
