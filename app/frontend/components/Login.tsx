@@ -16,6 +16,8 @@ import { uiStrings } from '../constants';
 import LanguageToggle from './common/LanguageToggle';
 import { useLanguage } from '../context/LanguageContext';
 
+import BhoomiAssistant from './BhoomiAssistant';
+
 interface LoginProps {
     onLoginSuccess: (user: UserProfile) => void;
 }
@@ -28,6 +30,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
     const [view, setView] = useState<ViewState>('intro');
     const [authMode, setAuthMode] = useState<AuthMode>('login');
+    const [isDemoAssistantOpen, setIsDemoAssistantOpen] = useState(false);
 
     // Form States
     const [identifier, setIdentifier] = useState(''); // Email or Phone Number for login
@@ -275,21 +278,62 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     // View 1: Public Landing Page
     if (view === 'intro') {
         return (
-            <LandingPage
-                texts={texts}
-                onEnterApp={() => setView('role-selection')}
-                currentLanguage={currentLanguage}
-                setCurrentLanguage={setCurrentLanguage}
-                onWeatherClick={() => setView('role-selection')}
-                onAssistantClick={() => setView('role-selection')}
-                onPlantAnalysisClick={() => setView('role-selection')}
-                onSoilAnalysisClick={() => setView('role-selection')}
-                onMarketplaceClick={() => setView('role-selection')}
-                onLogout={() => { }}
-                onProfileClick={() => setView('role-selection')}
-                onNavigate={() => { }}
-                user={undefined}
-            />
+            <div className="relative min-h-screen">
+                <LandingPage
+                    texts={texts}
+                    onEnterApp={() => setView('role-selection')}
+                    currentLanguage={currentLanguage}
+                    setCurrentLanguage={setCurrentLanguage}
+                    onWeatherClick={() => setView('role-selection')}
+                    onAssistantClick={() => setIsDemoAssistantOpen(true)}
+                    onPlantAnalysisClick={() => setView('role-selection')}
+                    onSoilAnalysisClick={() => setView('role-selection')}
+                    onMarketplaceClick={() => setView('role-selection')}
+                    onLogout={() => { }}
+                    onProfileClick={() => setView('role-selection')}
+                    onNavigate={() => { }}
+                    user={undefined}
+                />
+
+                {/* Free Demo Bhoomi Assistant Modal for Unauthenticated Guests */}
+                <AnimatePresence>
+                    {isDemoAssistantOpen && (
+                        <motion.div
+                            key="bhoomi-demo-modal"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/90 backdrop-blur-xl"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.95, y: 20 }}
+                                className="w-full max-w-5xl h-[90vh] bg-neutral-950 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl relative"
+                            >
+                                <BhoomiAssistant
+                                    user={{
+                                        id: 'guest',
+                                        email: '',
+                                        role: UserRole.USER,
+                                        fullName: isKannada ? 'ರೈತರು' : 'Guest Farmer',
+                                        location: 'Karnataka, India',
+                                        details: {}
+                                    }}
+                                    currentLanguage={currentLanguage}
+                                    setCurrentLanguage={setCurrentLanguage}
+                                    isDemoMode={true}
+                                    onRequireAuth={() => {
+                                        setIsDemoAssistantOpen(false);
+                                        setView('role-selection');
+                                    }}
+                                    onClose={() => setIsDemoAssistantOpen(false)}
+                                />
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
         );
     }
 

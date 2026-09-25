@@ -179,10 +179,91 @@ const useSarvamAudioRecorder = (
     return { startRecording, stopRecording, toggleRecording };
 };
 
+const DEMO_PROMPT_LIMIT = 3;
+
+const getStoredDemoCount = (): number => {
+    try {
+        const stored = sessionStorage.getItem('ava_bhoomi_demo_count') || localStorage.getItem('ava_bhoomi_demo_count');
+        return stored ? parseInt(stored, 10) || 0 : 0;
+    } catch {
+        return 0;
+    }
+};
+
+const setStoredDemoCount = (count: number) => {
+    try {
+        sessionStorage.setItem('ava_bhoomi_demo_count', count.toString());
+        localStorage.setItem('ava_bhoomi_demo_count', count.toString());
+    } catch {}
+};
+
+// Demo Limit / Auth Prompt Modal
+const AuthGateModal: React.FC<{
+    currentLanguage: Language;
+    onSignIn: () => void;
+    onClose?: () => void;
+}> = ({ currentLanguage, onSignIn, onClose }) => {
+    const isKn = currentLanguage === Language.KN;
+
+    return (
+        <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+        >
+            <motion.div
+                className="relative w-full max-w-md bg-neutral-950 border border-neutral-700 rounded-3xl p-6 sm:p-8 text-center text-white shadow-2xl overflow-hidden"
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+            >
+                <div className="absolute -top-12 -right-12 w-32 h-32 bg-gradient-to-br from-green-500/20 to-blue-500/20 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gradient-to-tr from-purple-500/20 to-pink-500/20 rounded-full blur-2xl pointer-events-none" />
+
+                <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-green-400 via-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <SparklesIcon className="w-8 h-8 text-white" />
+                </div>
+
+                <h3 className="text-2xl font-bold tracking-tight mb-2">
+                    {isKn ? "ಉಚಿತ ಡೆಮೊ ಮಿತಿ ತಲುಪಿದೆ!" : "Free Demo Limit Reached!"}
+                </h3>
+                <p className="text-sm text-neutral-300 leading-relaxed mb-6">
+                    {isKn
+                        ? "ನೀವು ಭೂಮಿ AI ಯ 3 ಉಚಿತ ಪ್ರಶ್ನೆಗಳನ್ನು ಪೂರ್ಣಗೊಳಿಸಿದ್ದೀರಿ. ಅನಿಯಮಿತ ಧ್ವನಿ ಸಂಭಾಷಣೆಗಳು, ಬೆಳೆ ರೋಗ ರಕ್ಷಣೆ ಮತ್ತು ಮಂಡಿ ದರಗಳನ್ನು ಪಡೆಯಲು ಖಾತೆಗೆ ಲಾಗ್ ಇನ್ ಅಥವಾ ಸೈನ್ ಅಪ್ ಮಾಡಿ."
+                        : "You've used all 3 free trial questions with Bhoomi AI. Create a free account or sign in to unlock unlimited voice consultations, crop health tracking, and live mandi rates."}
+                </p>
+
+                <div className="flex flex-col gap-3">
+                    <button
+                        onClick={onSignIn}
+                        className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold text-base shadow-lg shadow-purple-500/30 transform hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
+                        <span>{isKn ? "ಸೈನ್ ಇನ್ / ನೋಂದಾಯಿಸಿ" : "Sign In / Register to Continue"}</span>
+                        <ArrowRightIcon className="w-5 h-5" />
+                    </button>
+
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="w-full py-2.5 px-4 text-xs font-mono uppercase tracking-wider text-neutral-400 hover:text-white transition-colors"
+                        >
+                            {isKn ? "ಮುಚ್ಚಿ" : "Close"}
+                        </button>
+                    )}
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+};
+
 interface BhoomiAssistantProps {
-    user: UserProfile;
+    user?: UserProfile;
     currentLanguage: Language;
     setCurrentLanguage: (lang: Language) => void;
+    isDemoMode?: boolean;
+    onRequireAuth?: () => void;
+    onClose?: () => void;
 }
 
 // Listening View
@@ -244,7 +325,7 @@ const ListeningView: React.FC<{
 
 // Assistant Home Screen
 const AssistantHomeScreen: React.FC<{
-    user: UserProfile;
+    user?: UserProfile;
     texts: UIStringContent;
     currentLanguage: Language;
     onStartConversation: (p: string, a: File | null) => void;
@@ -252,11 +333,23 @@ const AssistantHomeScreen: React.FC<{
     isTranscribing: boolean;
     onToggleRecording: () => void;
     speechError: string | null;
-}> = ({ user, texts, currentLanguage, onStartConversation, isRecording, isTranscribing, onToggleRecording, speechError }) => {
+    isDemoMode?: boolean;
+    demoCount: number;
+    onRequireAuth?: () => void;
+    onClose?: () => void;
+    setCurrentLanguage: (lang: Language) => void;
+}> = ({ 
+    user, texts, currentLanguage, onStartConversation, isRecording, 
+    isTranscribing, onToggleRecording, speechError, isDemoMode, 
+    demoCount, onRequireAuth, onClose, setCurrentLanguage 
+}) => {
     const [userInput, setUserInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [factIndex, setFactIndex] = useState(0);
+
+    const isKn = currentLanguage === Language.KN;
+    const remainingPrompts = Math.max(0, DEMO_PROMPT_LIMIT - demoCount);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -277,8 +370,60 @@ const AssistantHomeScreen: React.FC<{
     };
 
     return (
-        <div className="flex flex-col h-full bhoomi-galaxy-container text-white p-4 md:p-8 overflow-hidden">
+        <div className="flex flex-col h-full bhoomi-galaxy-container text-white p-4 md:p-8 overflow-hidden relative">
             <div className="stars-bg"></div>
+
+            {/* Top Navigation & Demo Badge Bar */}
+            <div className="w-full flex justify-between items-center z-20 relative mb-2">
+                <div className="flex items-center gap-2">
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white border border-white/10 transition-colors text-xs flex items-center gap-1.5 font-mono"
+                            aria-label="Close Assistant"
+                        >
+                            <ArrowLeftIcon className="w-4 h-4" />
+                            <span className="hidden sm:inline">{isKn ? "ಮುಖ್ಯ ಪುಟ" : "Back to Home"}</span>
+                        </button>
+                    )}
+                </div>
+
+                {/* Demo Quota Badge */}
+                {isDemoMode && (
+                    <div className="flex items-center gap-2">
+                        {remainingPrompts > 0 ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono font-medium animate-pulse shadow-sm">
+                                <SparklesIcon className="w-3.5 h-3.5 text-blue-400" />
+                                <span>
+                                    {isKn 
+                                        ? `ಉಚಿತ ಡೆಮೊ: ${remainingPrompts}/${DEMO_PROMPT_LIMIT} ಪ್ರಶ್ನೆಗಳು ಬಾಕಿ`
+                                        : `Free Demo: ${remainingPrompts}/${DEMO_PROMPT_LIMIT} prompts left`}
+                                </span>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={onRequireAuth}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-red-500/20 border border-amber-500/40 text-amber-300 hover:text-white text-xs font-mono font-bold transition-all shadow-sm cursor-pointer"
+                            >
+                                <span>🔒 {isKn ? "ಮಿತಿ ಮುಗಿದಿದೆ • ಸೈನ್ ಇನ್ ಮಾಡಿ" : "Limit Reached • Sign In"}</span>
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                    <LanguageToggle currentLanguage={currentLanguage} setCurrentLanguage={setCurrentLanguage} size="sm" />
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white border border-white/10 transition-colors"
+                            aria-label="Close"
+                        >
+                            <XCircleIcon className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
+            </div>
 
             <div className="flex-1 flex flex-col justify-center items-center text-center z-10 relative">
                 <motion.div
@@ -318,26 +463,28 @@ const AssistantHomeScreen: React.FC<{
                                 type="text"
                                 value={userInput}
                                 onChange={(e) => setUserInput(e.target.value)}
-                                placeholder={isTranscribing ? "Recognizing speech with Sarvam AI..." : isRecording ? "Listening... Click mic again to stop" : texts.messagePlaceholder}
-                                className="relative w-full pl-6 pr-40 py-4 bg-transparent text-white placeholder-blue-200/50 text-lg border-none focus:ring-0 focus:outline-none"
+                                placeholder={isTranscribing ? "Recognizing speech with Sarvam AI..." : isRecording ? "Listening... Click mic again to stop" : isDemoMode && remainingPrompts === 0 ? "Demo limit reached. Click Sign In to continue." : texts.messagePlaceholder}
+                                disabled={isDemoMode && remainingPrompts === 0}
+                                className="relative w-full pl-6 pr-40 py-4 bg-transparent text-white placeholder-blue-200/50 text-lg border-none focus:ring-0 focus:outline-none disabled:opacity-60"
                             />
                             <div className="absolute top-1/2 right-3 transform -translate-y-1/2 flex items-center gap-2">
                                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*,application/pdf,.doc,.docx" />
 
-                                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isRecording} className="p-3 rounded-xl text-blue-300 hover:text-white hover:bg-white/10 transition-all" aria-label={texts.attachFile}>
+                                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isRecording || (isDemoMode && remainingPrompts === 0)} className="p-3 rounded-xl text-blue-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40" aria-label={texts.attachFile}>
                                     <PaperClipIcon className="w-6 h-6" />
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={onToggleRecording}
-                                    className={`p-3 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40 ring-2 ring-red-400' : isTranscribing ? 'bg-purple-600 text-white animate-spin' : 'text-blue-300 hover:text-white hover:bg-white/10'}`}
+                                    disabled={isDemoMode && remainingPrompts === 0}
+                                    className={`p-3 rounded-xl transition-all disabled:opacity-40 ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40 ring-2 ring-red-400' : isTranscribing ? 'bg-purple-600 text-white animate-spin' : 'text-blue-300 hover:text-white hover:bg-white/10'}`}
                                     aria-label={texts.askWithVoice}
                                 >
                                     <MicrophoneIcon className="w-6 h-6" />
                                 </button>
 
-                                <button type="submit" disabled={!userInput.trim() && !attachment} className="p-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:shadow-none transition-all transform hover:scale-105">
+                                <button type="submit" disabled={(!userInput.trim() && !attachment) || (isDemoMode && remainingPrompts === 0)} className="p-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:shadow-none transition-all transform hover:scale-105">
                                     <PaperAirplaneIcon className="w-6 h-6" />
                                 </button>
                             </div>
@@ -395,18 +542,25 @@ const ChatScreen: React.FC<{
     setCurrentLanguage: (l: Language) => void;
     onGoHome: () => void;
     speechError: string | null;
+    isDemoMode?: boolean;
+    demoCount: number;
+    onRequireAuth?: () => void;
+    onClose?: () => void;
 }> = (props) => {
     const {
         texts, currentLanguage, history, isLoading, onSendMessage,
         isVoiceEnabled, setIsVoiceEnabled, isRecording, isTranscribing,
         onToggleRecording, isSpeaking, onCancelSpeak, setCurrentLanguage,
-        onGoHome, speechError
+        onGoHome, speechError, isDemoMode, demoCount, onRequireAuth, onClose
     } = props;
     const [userInput, setUserInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const [displayLang, setDisplayLang] = useState<Language>(currentLanguage);
+
+    const isKn = currentLanguage === Language.KN;
+    const remainingPrompts = Math.max(0, DEMO_PROMPT_LIMIT - demoCount);
 
     useEffect(() => {
         if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -443,11 +597,34 @@ const ChatScreen: React.FC<{
                                 <h3 className="font-bold text-white text-lg leading-tight">Bhoomi AI</h3>
                                 <p className="text-xs text-blue-300 flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                                    Online
+                                    {isDemoMode ? (isKn ? "ಉಚಿತ ಡೆಮೊ" : "Free Demo Mode") : "Online"}
                                 </p>
                             </div>
                         </div>
                     </div>
+
+                    {/* Center: Demo Badge */}
+                    {isDemoMode && (
+                        <div className="hidden sm:flex items-center">
+                            {remainingPrompts > 0 ? (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono font-medium shadow-sm">
+                                    <SparklesIcon className="w-3.5 h-3.5 text-blue-400" />
+                                    <span>
+                                        {isKn 
+                                            ? `${remainingPrompts}/${DEMO_PROMPT_LIMIT} ಪ್ರಶ್ನೆಗಳು ಬಾಕಿ`
+                                            : `${remainingPrompts}/${DEMO_PROMPT_LIMIT} prompts left`}
+                                    </span>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={onRequireAuth}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:text-white text-xs font-mono font-bold transition-all cursor-pointer shadow-sm"
+                                >
+                                    <span>🔒 {isKn ? "ಸೈನ್ ಇನ್ ಮಾಡಿ" : "Sign In to Continue"}</span>
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-3">
                         <LanguageToggle currentLanguage={currentLanguage} setCurrentLanguage={setCurrentLanguage} />
@@ -473,6 +650,16 @@ const ChatScreen: React.FC<{
                             >
                                 {isVoiceEnabled ? <SpeakerWaveIcon className="w-5 h-5" /> : <SpeakerXMarkIcon className="w-5 h-5" />}
                             </Button>
+                        )}
+
+                        {onClose && (
+                            <button
+                                onClick={onClose}
+                                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white border border-white/10 transition-colors"
+                                aria-label="Close"
+                            >
+                                <XCircleIcon className="w-5 h-5" />
+                            </button>
                         )}
                     </div>
                 </div>
@@ -630,7 +817,7 @@ interface TTSPlaylistItem {
 
 // Bhoomi AI Assistant Main Component
 const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
-    const { currentLanguage, user, setCurrentLanguage } = props;
+    const { currentLanguage, user, setCurrentLanguage, isDemoMode = false, onRequireAuth, onClose } = props;
     const texts = uiStrings[currentLanguage];
     const [currentView, setCurrentView] = useState<'home' | 'chat'>('home');
     const [history, setHistory] = useState<ChatMessage[]>([]);
@@ -640,6 +827,8 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [speechError, setSpeechError] = useState<string | null>(null);
+    const [demoCount, setDemoCount] = useState<number>(() => isDemoMode ? getStoredDemoCount() : 0);
+    const [showAuthGate, setShowAuthGate] = useState<boolean>(false);
     const isSendingRef = useRef(false);
 
     // ============ WEB AUDIO API & STREAMING TTS PIPELINE ============
@@ -834,6 +1023,18 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     const handleSendMessage = useCallback(async (message: string, attachment: File | null) => {
         if (isSendingRef.current || isLoading) return;
 
+        // Check if Demo Quota limit reached
+        if (isDemoMode && demoCount >= DEMO_PROMPT_LIMIT) {
+            setShowAuthGate(true);
+            return;
+        }
+
+        if (isDemoMode) {
+            const nextCount = demoCount + 1;
+            setDemoCount(nextCount);
+            setStoredDemoCount(nextCount);
+        }
+
         isSendingRef.current = true;
         handleCancelSpeak(); // Clear previous speech & reset session
         setCurrentView('chat');
@@ -1000,7 +1201,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
             setIsLoading(false);
             isSendingRef.current = false;
         }
-    }, [currentLanguage, history, isVoiceEnabled, queueSpeech, texts, isLoading]);
+    }, [currentLanguage, history, isVoiceEnabled, queueSpeech, texts, isLoading, isDemoMode, demoCount]);
 
     const handleVoiceResult = useCallback((transcript: string) => {
         if (transcript && transcript.trim()) {
@@ -1051,6 +1252,14 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                             isTranscribing={isTranscribing}
                             onToggleRecording={handleMicToggle}
                             speechError={speechError}
+                            isDemoMode={isDemoMode}
+                            demoCount={demoCount}
+                            onRequireAuth={() => {
+                                handleCancelSpeak();
+                                onRequireAuth?.();
+                            }}
+                            onClose={onClose}
+                            setCurrentLanguage={setCurrentLanguage}
                         />
                     </motion.div>
                 ) : (
@@ -1071,6 +1280,13 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                             setCurrentLanguage={setCurrentLanguage}
                             onGoHome={goHome}
                             speechError={speechError}
+                            isDemoMode={isDemoMode}
+                            demoCount={demoCount}
+                            onRequireAuth={() => {
+                                handleCancelSpeak();
+                                onRequireAuth?.();
+                            }}
+                            onClose={onClose}
                         />
                     </motion.div>
                 )}
@@ -1083,6 +1299,20 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                         speechError={speechError}
                         isTranscribing={isTranscribing}
                         onStop={stopRecording}
+                    />
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {showAuthGate && (
+                    <AuthGateModal
+                        currentLanguage={currentLanguage}
+                        onSignIn={() => {
+                            setShowAuthGate(false);
+                            handleCancelSpeak();
+                            onRequireAuth?.();
+                        }}
+                        onClose={() => setShowAuthGate(false)}
                     />
                 )}
             </AnimatePresence>
