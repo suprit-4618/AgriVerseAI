@@ -81,8 +81,7 @@ export const transcribeSarvamAudio = async (
   for (const url of urls) {
     try {
       const formData = new FormData();
-      const ext = audioBlob.type.includes('mp4') ? 'm4a' : audioBlob.type.includes('wav') ? 'wav' : 'webm';
-      formData.append('file', audioBlob, `speech.${ext}`);
+      formData.append('file', audioBlob, 'speech.wav');
       formData.append('model', 'saaras:v3');
       formData.append('language_code', language === Language.KN ? 'kn-IN' : 'en-IN');
 

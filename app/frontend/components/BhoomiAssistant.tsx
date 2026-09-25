@@ -8,7 +8,7 @@ import { getPlantDiseaseAnalysis, generateSpeech, getBhoomiResponseStream } from
 import { generateSarvamSpeech, transcribeSarvamAudio } from '../services/sarvamService';
 import { getGroqBhoomiStream } from '../services/groqService';
 import {
-    ArrowLeftIcon, PaperClipIcon, XCircleIcon, MicrophoneIcon, PaperAirplaneIcon, SparklesIcon,
+    ArrowLeftIcon, ArrowRightIcon, PaperClipIcon, XCircleIcon, MicrophoneIcon, PaperAirplaneIcon, SparklesIcon,
     SpeakerWaveIcon, SpeakerXMarkIcon, UserCircleIcon
 } from './common/IconComponents';
 import ListeningAnimation from './common/ListeningAnimation';
@@ -71,102 +71,263 @@ const convertPCM16ToFloat32 = (pcmData: ArrayBuffer): Float32Array => {
     return float32Array;
 };
 
-// High-Accuracy Speech Recognition Hook powered by Sarvam AI Saaras:v3
-const useSarvamAudioRecorder = (
+// Pure in-browser standard 16kHz 16-bit Mono PCM WAV Encoder
+const encodeWAV = (samples: Float32Array, sampleRate: number = 16000): Blob => {
+    const numChannels = 1;
+    const bitDepth = 16;
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = samples.length * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+
+    const writeString = (offset: number, string: string) => {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM format
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++, offset += 2) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+
+    return new Blob([view], { type: 'audio/wav' });
+};
+
+// High-Accuracy Dual-Tier Speech Recognition Hook
+// Tier 1: Instant Native Web Speech API (Real-time live transcript for Kannada kn-IN & English en-IN)
+// Tier 2: 16kHz Clean PCM WAV AudioContext Recording + Sarvam AI Saaras:v3 Indian Voice STT
+const useVoiceSpeechRecognition = (
     onResult: (t: string) => void,
     onRecordingChange: (recording: boolean) => void,
     onTranscribingChange: (transcribing: boolean) => void,
     onError: (e: string) => void,
+    onInterimResult: (interim: string) => void,
     lang: Language
 ) => {
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
-    const streamRef = useRef<MediaStream | null>(null);
-    const silenceTimerRef = useRef<any>(null);
+    const recognitionRef = useRef<any>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const mediaStreamRef = useRef<MediaStream | null>(null);
+    const audioChunksRef = useRef<Float32Array[]>([]);
+    const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+    const silenceTimeoutRef = useRef<any>(null);
+    const transcriptRef = useRef<string>('');
+    const isRecordingRef = useRef<boolean>(false);
+    const activeMethodRef = useRef<'webspeech' | 'audioContext' | null>(null);
+
+    const cleanupAudio = useCallback(() => {
+        if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = null;
+        }
+        if (scriptProcessorRef.current) {
+            try {
+                scriptProcessorRef.current.disconnect();
+            } catch {}
+            scriptProcessorRef.current = null;
+        }
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(t => t.stop());
+            mediaStreamRef.current = null;
+        }
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            try {
+                audioContextRef.current.close();
+            } catch {}
+            audioContextRef.current = null;
+        }
+    }, []);
+
+    const stopRecording = useCallback(async () => {
+        if (!isRecordingRef.current) return;
+        isRecordingRef.current = false;
+        onRecordingChange(false);
+
+        if (activeMethodRef.current === 'webspeech' && recognitionRef.current) {
+            try {
+                recognitionRef.current.stop();
+            } catch {}
+            const final = transcriptRef.current.trim();
+            if (final) {
+                onResult(final);
+            }
+        } else if (activeMethodRef.current === 'audioContext') {
+            cleanupAudio();
+            const totalSamples = audioChunksRef.current.reduce((acc, c) => acc + c.length, 0);
+            if (totalSamples > 8000) {
+                onTranscribingChange(true);
+                try {
+                    const merged = new Float32Array(totalSamples);
+                    let offset = 0;
+                    for (const chunk of audioChunksRef.current) {
+                        merged.set(chunk, offset);
+                        offset += chunk.length;
+                    }
+                    const wavBlob = encodeWAV(merged, 16000);
+                    const sarvamTranscript = await transcribeSarvamAudio(wavBlob, lang);
+                    onTranscribingChange(false);
+                    if (sarvamTranscript && sarvamTranscript.trim()) {
+                        onResult(sarvamTranscript.trim());
+                    } else {
+                        onError(lang === Language.KN ? "ಧ್ವನಿ ಸ್ಪಷ್ಟವಾಗಿ ಕೇಳಿಸಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ." : "No speech detected. Please speak closer to the mic.");
+                    }
+                } catch (err: any) {
+                    onTranscribingChange(false);
+                    console.warn("Sarvam STT fallback error:", err);
+                    onError(lang === Language.KN ? "ಧ್ವನಿ ಗುರುತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಟೈಪ್ ಮಾಡಿ." : "Speech recognition failed. Please try typing.");
+                }
+            } else {
+                onError(lang === Language.KN ? "ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ. ಮೈಕ್ ಹತ್ತಿರ ಮಾತನಾಡಿ." : "No audio detected. Please speak into the mic.");
+            }
+        }
+        cleanupAudio();
+    }, [cleanupAudio, lang, onRecordingChange, onResult, onTranscribingChange, onError]);
 
     const startRecording = useCallback(async () => {
+        cleanupAudio();
+        transcriptRef.current = '';
+        onInterimResult('');
+        isRecordingRef.current = true;
+
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (SpeechRec) {
+            try {
+                activeMethodRef.current = 'webspeech';
+                const recognition = new SpeechRec();
+                recognitionRef.current = recognition;
+                recognition.lang = lang === Language.KN ? 'kn-IN' : 'en-IN';
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.maxAlternatives = 1;
+
+                recognition.onstart = () => {
+                    onRecordingChange(true);
+                };
+
+                recognition.onresult = (event: any) => {
+                    let interimText = '';
+                    let finalText = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcriptPart = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalText += transcriptPart;
+                        } else {
+                            interimText += transcriptPart;
+                        }
+                    }
+                    if (finalText) {
+                        transcriptRef.current = finalText;
+                        onInterimResult(finalText);
+                    } else if (interimText) {
+                        transcriptRef.current = interimText;
+                        onInterimResult(interimText);
+                    }
+                };
+
+                recognition.onerror = (event: any) => {
+                    console.warn("WebSpeech recognition error:", event.error);
+                    if (event.error === 'not-allowed') {
+                        onError(lang === Language.KN ? "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ಅಗತ್ಯವಿದೆ." : "Microphone permission is required to use voice input.");
+                        isRecordingRef.current = false;
+                        onRecordingChange(false);
+                    } else if (event.error === 'no-speech') {
+                        onError(lang === Language.KN ? "ಯಾವುದೇ ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ." : "No speech detected. Please speak closer to the mic.");
+                        isRecordingRef.current = false;
+                        onRecordingChange(false);
+                    }
+                };
+
+                recognition.onend = () => {
+                    if (isRecordingRef.current) {
+                        isRecordingRef.current = false;
+                        onRecordingChange(false);
+                        const result = transcriptRef.current.trim();
+                        if (result) {
+                            onResult(result);
+                        }
+                    }
+                };
+
+                recognition.start();
+
+                // Safety timeout: stop after 10s
+                silenceTimeoutRef.current = setTimeout(() => {
+                    if (isRecordingRef.current) {
+                        stopRecording();
+                    }
+                }, 10000);
+
+                return;
+            } catch (recErr) {
+                console.warn("SpeechRecognition init failed, switching to AudioContext 16kHz WAV + Sarvam AI:", recErr);
+            }
+        }
+
+        // Secondary fallback: Native AudioContext 16kHz WAV recording for Sarvam AI Saaras:v3
         try {
-            audioChunksRef.current = [];
+            activeMethodRef.current = 'audioContext';
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
+                    channelCount: 1,
+                    sampleRate: 16000,
                     echoCancellation: true,
                     noiseSuppression: true,
                     autoGainControl: true
                 }
             });
-            streamRef.current = stream;
+            mediaStreamRef.current = stream;
 
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? 'audio/webm;codecs=opus'
-                : MediaRecorder.isTypeSupported('audio/mp4')
-                ? 'audio/mp4'
-                : '';
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const audioCtx = new AudioCtx({ sampleRate: 16000 });
+            audioContextRef.current = audioCtx;
 
-            const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-            mediaRecorderRef.current = recorder;
+            const source = audioCtx.createMediaStreamSource(stream);
+            const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+            scriptProcessorRef.current = processor;
+            audioChunksRef.current = [];
 
-            recorder.ondataavailable = (e) => {
-                if (e.data && e.data.size > 0) {
-                    audioChunksRef.current.push(e.data);
-                }
+            processor.onaudioprocess = (e) => {
+                if (!isRecordingRef.current) return;
+                const channelData = e.inputBuffer.getChannelData(0);
+                audioChunksRef.current.push(new Float32Array(channelData));
             };
 
-            recorder.onstop = async () => {
-                onRecordingChange(false);
-                if (streamRef.current) {
-                    streamRef.current.getTracks().forEach(track => track.stop());
-                    streamRef.current = null;
-                }
+            source.connect(processor);
+            processor.connect(audioCtx.destination);
 
-                const audioBlob = new Blob(audioChunksRef.current, {
-                    type: recorder.mimeType || 'audio/webm'
-                });
-
-                if (audioBlob.size < 500) {
-                    return;
-                }
-
-                onTranscribingChange(true);
-                try {
-                    console.log("Transcribing audio with Sarvam Saaras:v3...");
-                    const transcript = await transcribeSarvamAudio(audioBlob, lang);
-                    onTranscribingChange(false);
-                    if (transcript && transcript.trim()) {
-                        onResult(transcript.trim());
-                    } else {
-                        onError("No speech detected. Please speak closer to the mic.");
-                    }
-                } catch (err: any) {
-                    onTranscribingChange(false);
-                    console.warn("Sarvam STT failed:", err);
-                    onError("Could not transcribe speech. Please try again or type.");
-                }
-            };
-
-            recorder.start(200);
             onRecordingChange(true);
 
-            // Auto stop after 8 seconds of continuous recording
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-            silenceTimerRef.current = setTimeout(() => {
-                if (recorder.state === 'recording') {
-                    recorder.stop();
+            silenceTimeoutRef.current = setTimeout(() => {
+                if (isRecordingRef.current) {
+                    stopRecording();
                 }
             }, 8000);
 
-        } catch (err: any) {
-            console.error("Microphone access error:", err);
+        } catch (mediaErr: any) {
+            console.error("Microphone access error:", mediaErr);
+            isRecordingRef.current = false;
             onRecordingChange(false);
-            onError("Microphone permission needed to use voice input.");
+            onError(lang === Language.KN ? "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ಅಗತ್ಯವಿದೆ." : "Microphone access denied. Please allow microphone access in your browser.");
         }
-    }, [lang, onResult, onRecordingChange, onTranscribingChange, onError]);
-
-    const stopRecording = useCallback(() => {
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
-        }
-    }, []);
+    }, [cleanupAudio, lang, onInterimResult, onRecordingChange, onError, stopRecording, onResult]);
 
     const toggleRecording = useCallback((isCurrentlyRecording: boolean) => {
         if (isCurrentlyRecording) {
@@ -175,6 +336,12 @@ const useSarvamAudioRecorder = (
             startRecording();
         }
     }, [startRecording, stopRecording]);
+
+    useEffect(() => {
+        return () => {
+            cleanupAudio();
+        };
+    }, [cleanupAudio]);
 
     return { startRecording, stopRecording, toggleRecording };
 };
@@ -271,12 +438,13 @@ const ListeningView: React.FC<{
     texts: UIStringContent;
     speechError: string | null;
     isTranscribing?: boolean;
+    liveTranscript?: string;
     onStop?: () => void;
-}> = ({ texts, speechError, isTranscribing, onStop }) => {
+}> = ({ texts, speechError, isTranscribing, liveTranscript, onStop }) => {
     return (
         <motion.div
             key="listening-view"
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center listening-overlay-bg rounded-2xl backdrop-blur-xl bg-black/70 cursor-pointer"
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center listening-overlay-bg rounded-2xl backdrop-blur-xl bg-black/80 cursor-pointer select-none"
             onClick={onStop}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -284,17 +452,29 @@ const ListeningView: React.FC<{
             transition={{ duration: 0.2 }}
         >
             <motion.p
-                className="text-white text-3xl font-light mb-12 tracking-wide text-center"
+                className="text-white text-2xl sm:text-3xl font-light mb-6 tracking-wide text-center px-4"
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
             >
                 {isTranscribing ? "Recognizing speech with Sarvam AI..." : texts.listening}
             </motion.p>
 
-            <ListeningAnimation />
+            {/* Live interim transcript display as user speaks */}
+            {liveTranscript && liveTranscript.trim() ? (
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-lg mx-4 mb-6 px-5 py-3 rounded-2xl bg-neutral-900/90 border border-green-500/40 shadow-xl backdrop-blur-md text-center"
+                >
+                    <p className="text-sm font-mono text-green-400 mb-1 uppercase tracking-wider">🎙️ Spoken Words:</p>
+                    <p className="text-lg font-medium text-white italic">"{liveTranscript}"</p>
+                </motion.div>
+            ) : (
+                <ListeningAnimation />
+            )}
 
             <motion.div
-                className="absolute bottom-16 flex flex-col items-center gap-3"
+                className="absolute bottom-12 flex flex-col items-center gap-3"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1, transition: { delay: 0.2 } }}
             >
@@ -304,18 +484,18 @@ const ListeningView: React.FC<{
                         e.stopPropagation();
                         onStop?.();
                     }}
-                    className="w-20 h-20 bg-gradient-to-r from-red-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 animate-pulse hover:scale-105 active:scale-95 transition-transform"
+                    className="w-20 h-20 bg-gradient-to-r from-red-500 via-pink-600 to-purple-600 rounded-full flex items-center justify-center shadow-2xl shadow-red-500/50 animate-pulse hover:scale-105 active:scale-95 transition-transform"
                     aria-label="Stop recording"
                 >
                     <MicrophoneIcon className="w-10 h-10 text-white" />
                 </button>
-                <span className="text-sm text-blue-200/80 font-medium bg-black/40 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">
-                    Click anywhere or mic to Stop & Send
+                <span className="text-xs sm:text-sm text-neutral-300 font-medium bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-sm border border-neutral-700">
+                    Click anywhere or mic when finished speaking
                 </span>
             </motion.div>
 
             {speechError && (
-                <div className="absolute top-10 text-red-200 bg-red-900/50 border border-red-500/30 px-6 py-3 rounded-xl backdrop-blur-md">
+                <div className="absolute top-8 mx-4 text-sm text-red-200 bg-red-900/80 border border-red-500/50 px-6 py-3 rounded-xl backdrop-blur-md shadow-2xl">
                     {speechError}
                 </div>
             )}
@@ -825,6 +1005,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
+    const [liveTranscript, setLiveTranscript] = useState<string>('');
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [speechError, setSpeechError] = useState<string | null>(null);
     const [demoCount, setDemoCount] = useState<number>(() => isDemoMode ? getStoredDemoCount() : 0);
@@ -1217,17 +1398,19 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         setTimeout(() => setSpeechError(null), 4000);
     }, [texts]);
 
-    const { stopRecording, toggleRecording } = useSarvamAudioRecorder(
+    const { stopRecording, toggleRecording } = useVoiceSpeechRecognition(
         handleVoiceResult,
         setIsRecording,
         setIsTranscribing,
         handleSpeechError,
+        setLiveTranscript,
         currentLanguage
     );
 
     const handleMicToggle = useCallback(() => {
         handleCancelSpeak();
         setSpeechError(null);
+        setLiveTranscript('');
         toggleRecording(isRecording);
     }, [handleCancelSpeak, toggleRecording, isRecording]);
 
@@ -1298,6 +1481,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                         texts={texts}
                         speechError={speechError}
                         isTranscribing={isTranscribing}
+                        liveTranscript={liveTranscript}
                         onStop={stopRecording}
                     />
                 )}
