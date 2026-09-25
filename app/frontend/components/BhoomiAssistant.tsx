@@ -1,20 +1,23 @@
+"use client";
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Language, UserProfile, UIStringContent, ChatMessage } from '../types';
 import { uiStrings } from '../constants';
-import Button from './common/Button';
-import LoadingSpinner from './common/LoadingSpinner';
 import { getPlantDiseaseAnalysis, generateSpeech, getBhoomiResponseStream } from '../services/geminiService';
 import { generateSarvamSpeech, transcribeSarvamAudio } from '../services/sarvamService';
 import { getGroqBhoomiStream } from '../services/groqService';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
-    ArrowLeftIcon, ArrowRightIcon, PaperClipIcon, XCircleIcon, MicrophoneIcon, PaperAirplaneIcon, SparklesIcon,
-    SpeakerWaveIcon, SpeakerXMarkIcon, UserCircleIcon
-} from './common/IconComponents';
+    Sparkles, Paperclip, ArrowUp, ArrowLeft, Mic, MicOff, Volume2, VolumeX,
+    Sprout, TrendingUp, FlaskConical, CloudRain, Bug, Building2, X, Check,
+    Copy, RotateCcw, Info, ShieldCheck, ArrowRight, UserCircle2, CornerDownLeft
+} from 'lucide-react';
 import ListeningAnimation from './common/ListeningAnimation';
 import GeneratingAnimation from './common/GeneratingAnimation';
 import MarkdownRenderer from './common/MarkdownRenderer';
-import LanguageToggle from './common/LanguageToggle';
 import PlantAnalysisResult from './PlantAnalysisResult';
 import './BhoomiGalaxyTheme.css';
 
@@ -25,6 +28,42 @@ declare global {
         webkitSpeechRecognition: any;
         webkitAudioContext: any;
     }
+}
+
+// Auto-resizing Textarea Hook
+interface AutoResizeProps {
+    minHeight: number;
+    maxHeight?: number;
+}
+
+function useAutoResizeTextarea({ minHeight, maxHeight }: AutoResizeProps) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const adjustHeight = useCallback(
+        (reset?: boolean) => {
+            const textarea = textareaRef.current;
+            if (!textarea) return;
+
+            if (reset) {
+                textarea.style.height = `${minHeight}px`;
+                return;
+            }
+
+            textarea.style.height = `${minHeight}px`;
+            const newHeight = Math.max(
+                minHeight,
+                Math.min(textarea.scrollHeight, maxHeight ?? 160)
+            );
+            textarea.style.height = `${newHeight}px`;
+        },
+        [minHeight, maxHeight]
+    );
+
+    useEffect(() => {
+        if (textareaRef.current) textareaRef.current.style.height = `${minHeight}px`;
+    }, [minHeight]);
+
+    return { textareaRef, adjustHeight };
 }
 
 const fileToDataURL = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -112,8 +151,6 @@ const encodeWAV = (samples: Float32Array, sampleRate: number = 16000): Blob => {
 };
 
 // High-Accuracy Dual-Tier Speech Recognition Hook
-// Tier 1: Instant Native Web Speech API (Real-time live transcript for Kannada kn-IN & English en-IN)
-// Tier 2: 16kHz Clean PCM WAV AudioContext Recording + Sarvam AI Saaras:v3 Indian Voice STT
 const useVoiceSpeechRecognition = (
     onResult: (t: string) => void,
     onRecordingChange: (recording: boolean) => void,
@@ -268,7 +305,6 @@ const useVoiceSpeechRecognition = (
 
                 recognition.start();
 
-                // Safety timeout: stop after 10s
                 silenceTimeoutRef.current = setTimeout(() => {
                     if (isRecordingRef.current) {
                         stopRecording();
@@ -281,7 +317,6 @@ const useVoiceSpeechRecognition = (
             }
         }
 
-        // Secondary fallback: Native AudioContext 16kHz WAV recording for Sarvam AI Saaras:v3
         try {
             activeMethodRef.current = 'audioContext';
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -380,16 +415,16 @@ const AuthGateModal: React.FC<{
             exit={{ opacity: 0 }}
         >
             <motion.div
-                className="relative w-full max-w-md bg-neutral-950 border border-neutral-700 rounded-3xl p-6 sm:p-8 text-center text-white shadow-2xl overflow-hidden"
+                className="relative w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-3xl p-6 sm:p-8 text-center text-white shadow-2xl overflow-hidden"
                 initial={{ scale: 0.9, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, y: 20 }}
             >
-                <div className="absolute -top-12 -right-12 w-32 h-32 bg-gradient-to-br from-green-500/20 to-blue-500/20 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute -top-12 -right-12 w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-blue-500/20 rounded-full blur-2xl pointer-events-none" />
                 <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gradient-to-tr from-purple-500/20 to-pink-500/20 rounded-full blur-2xl pointer-events-none" />
 
-                <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-green-400 via-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                    <SparklesIcon className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-500 to-blue-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                    <Sparkles className="w-8 h-8 text-white" />
                 </div>
 
                 <h3 className="text-2xl font-bold tracking-tight mb-2">
@@ -404,10 +439,10 @@ const AuthGateModal: React.FC<{
                 <div className="flex flex-col gap-3">
                     <button
                         onClick={onSignIn}
-                        className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold text-base shadow-lg shadow-purple-500/30 transform hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-base shadow-lg shadow-emerald-500/30 transform hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                     >
                         <span>{isKn ? "ಸೈನ್ ಇನ್ / ನೋಂದಾಯಿಸಿ" : "Sign In / Register to Continue"}</span>
-                        <ArrowRightIcon className="w-5 h-5" />
+                        <ArrowRight className="w-5 h-5" />
                     </button>
 
                     {onClose && (
@@ -433,7 +468,7 @@ interface BhoomiAssistantProps {
     onClose?: () => void;
 }
 
-// Listening View
+// Listening View (Celestial Glass Fullscreen Modal)
 const ListeningView: React.FC<{
     texts: UIStringContent;
     speechError: string | null;
@@ -444,7 +479,7 @@ const ListeningView: React.FC<{
     return (
         <motion.div
             key="listening-view"
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center listening-overlay-bg rounded-2xl backdrop-blur-xl bg-black/80 cursor-pointer select-none"
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-3xl backdrop-blur-2xl bg-black/85 cursor-pointer select-none px-4"
             onClick={onStop}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -452,21 +487,20 @@ const ListeningView: React.FC<{
             transition={{ duration: 0.2 }}
         >
             <motion.p
-                className="text-white text-2xl sm:text-3xl font-light mb-6 tracking-wide text-center px-4"
+                className="text-white text-2xl sm:text-3xl font-light mb-6 tracking-wide text-center"
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
             >
                 {isTranscribing ? "Recognizing speech with Sarvam AI..." : texts.listening}
             </motion.p>
 
-            {/* Live interim transcript display as user speaks */}
             {liveTranscript && liveTranscript.trim() ? (
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-lg mx-4 mb-6 px-5 py-3 rounded-2xl bg-neutral-900/90 border border-green-500/40 shadow-xl backdrop-blur-md text-center"
+                    className="max-w-lg w-full mx-4 mb-6 px-6 py-4 rounded-2xl bg-neutral-900/90 border border-emerald-500/40 shadow-2xl backdrop-blur-md text-center"
                 >
-                    <p className="text-sm font-mono text-green-400 mb-1 uppercase tracking-wider">🎙️ Spoken Words:</p>
+                    <p className="text-xs font-mono text-emerald-400 mb-1 uppercase tracking-wider">🎙️ Spoken Words:</p>
                     <p className="text-lg font-medium text-white italic">"{liveTranscript}"</p>
                 </motion.div>
             ) : (
@@ -487,9 +521,9 @@ const ListeningView: React.FC<{
                     className="w-20 h-20 bg-gradient-to-r from-red-500 via-pink-600 to-purple-600 rounded-full flex items-center justify-center shadow-2xl shadow-red-500/50 animate-pulse hover:scale-105 active:scale-95 transition-transform"
                     aria-label="Stop recording"
                 >
-                    <MicrophoneIcon className="w-10 h-10 text-white" />
+                    <Mic className="w-10 h-10 text-white" />
                 </button>
-                <span className="text-xs sm:text-sm text-neutral-300 font-medium bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-sm border border-neutral-700">
+                <span className="text-xs sm:text-sm text-neutral-300 font-medium bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-sm border border-neutral-800">
                     Click anywhere or mic when finished speaking
                 </span>
             </motion.div>
@@ -503,7 +537,30 @@ const ListeningView: React.FC<{
     );
 };
 
-// Assistant Home Screen
+// Redesigned Celestial Quick Action Pill Component
+interface QuickActionPillProps {
+    icon: React.ReactNode;
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+}
+
+const QuickActionPill: React.FC<QuickActionPillProps> = ({ icon, label, onClick, disabled }) => {
+    return (
+        <Button
+            type="button"
+            variant="outline"
+            onClick={onClick}
+            disabled={disabled}
+            className="flex items-center gap-2.5 px-4 py-2.5 rounded-full border-neutral-800/80 bg-neutral-900/70 hover:bg-neutral-800/90 text-neutral-200 hover:text-white shadow-lg backdrop-blur-md transition-all transform hover:scale-[1.03] active:scale-[0.98] disabled:opacity-40"
+        >
+            <span className="text-emerald-400">{icon}</span>
+            <span className="text-xs sm:text-sm font-medium">{label}</span>
+        </Button>
+    );
+};
+
+// Assistant Home Screen (Ruixen-Inspired Modern Celestial Design)
 const AssistantHomeScreen: React.FC<{
     user?: UserProfile;
     texts: UIStringContent;
@@ -525,11 +582,18 @@ const AssistantHomeScreen: React.FC<{
 }) => {
     const [userInput, setUserInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
+    const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [factIndex, setFactIndex] = useState(0);
 
+    const { textareaRef, adjustHeight } = useAutoResizeTextarea({
+        minHeight: 52,
+        maxHeight: 160
+    });
+
     const isKn = currentLanguage === Language.KN;
     const remainingPrompts = Math.max(0, DEMO_PROMPT_LIMIT - demoCount);
+    const isQuotaLocked = isDemoMode && remainingPrompts === 0;
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -538,450 +602,775 @@ const AssistantHomeScreen: React.FC<{
         return () => clearInterval(interval);
     }, [texts.agriculturalFacts.length]);
 
-    const handleSubmit = () => {
-        if (userInput.trim() || attachment) {
-            onStartConversation(userInput, attachment);
-            setUserInput('');
-            setAttachment(null);
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setAttachment(file);
+            try {
+                const preview = await fileToDataURL(file);
+                setAttachmentPreview(preview);
+            } catch {
+                setAttachmentPreview(null);
+            }
         }
     };
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) setAttachment(e.target.files[0]);
+
+    const handleRemoveAttachment = () => {
+        setAttachment(null);
+        setAttachmentPreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    return (
-        <div className="flex flex-col h-full bhoomi-galaxy-container text-white p-4 md:p-8 overflow-hidden relative">
-            <div className="stars-bg"></div>
+    const handleSubmit = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (isQuotaLocked) {
+            onRequireAuth?.();
+            return;
+        }
+        if (userInput.trim() || attachment) {
+            onStartConversation(userInput.trim(), attachment);
+            setUserInput('');
+            setAttachment(null);
+            setAttachmentPreview(null);
+            adjustHeight(true);
+        }
+    };
 
-            {/* Top Navigation & Demo Badge Bar */}
-            <div className="w-full flex justify-between items-center z-20 relative mb-2">
+    const handleQuickAction = (promptText: string) => {
+        if (isQuotaLocked) {
+            onRequireAuth?.();
+            return;
+        }
+        onStartConversation(promptText, null);
+    };
+
+    const quickActions = [
+        {
+            icon: <Sprout className="w-4 h-4 text-emerald-400" />,
+            label: isKn ? "ಬೆಳೆ ರೋಗ ಪರೀಕ್ಷೆ" : "Crop Disease Diagnosis",
+            prompt: isKn ? "ನನ್ನ ಬೆಳೆಯಲ್ಲಿ ಎಲೆಗಳು ಹಳದಿಯಾಗುತ್ತಿವೆ ಮತ್ತು ಕಲೆಗಳು ಕಾಣಿಸುತ್ತಿವೆ. ಇದಕ್ಕೆ ಪರಿಹಾರ ಮತ್ತು ಔಷಧಿ ತಿಳಿಸಿ." : "How to diagnose and cure leaf yellowing and fungal spots on crops?"
+        },
+        {
+            icon: <TrendingUp className="w-4 h-4 text-amber-400" />,
+            label: isKn ? "ಇಂದಿನ ಮಂಡಿ ದರಗಳು" : "Live Mandi Prices",
+            prompt: isKn ? "ಕರ್ನಾಟಕದ ಇಂದಿನ ಪ್ರಮುಖ ಮಾರುಕಟ್ಟೆಗಳಲ್ಲಿ ಟೊಮೆಟೊ, ಈರುಳ್ಳಿ ಮತ್ತು ಭತ್ತದ ದರಗಳೇನು?" : "What are today's market mandi prices for Tomato, Onion, and Paddy in Karnataka?"
+        },
+        {
+            icon: <FlaskConical className="w-4 h-4 text-cyan-400" />,
+            label: isKn ? "ಮಣ್ಣಿನ ಪೋಷಕಾಂಶ ಸಲಹೆ" : "Soil Health & NPK",
+            prompt: isKn ? "ಹೆಚ್ಚಿನ ಇಳುವರಿಗಾಗಿ ಜಮೀನಿನಲ್ಲಿ NPK ಗೊಬ್ಬರದ ಸಮತೋಲನ ಪ್ರಮಾಣ ಮತ್ತು ಮಣ್ಣಿನ ಫಲವತ್ತತೆ ಸಲಹೆ ನೀಡಿ." : "What is the recommended NPK fertilizer schedule and soil fertility improvement tips?"
+        },
+        {
+            icon: <CloudRain className="w-4 h-4 text-blue-400" />,
+            label: isKn ? "ಹವಾಮಾನ & ನೀರಾವರಿ" : "Weather & Irrigation",
+            prompt: isKn ? "ಮುಂಬರುವ ದಿನಗಳ ಹವಾಮಾನ ಮುನ್ಸೂಚನೆ ಆಧರಿಸಿ ಕೃಷಿ ನೀರಾವರಿ ಹೇಗೆ ನಿರ್ವಹಿಸಬೇಕು?" : "How should I plan drip irrigation based on upcoming weather and rainfall forecasts?"
+        },
+        {
+            icon: <Bug className="w-4 h-4 text-rose-400" />,
+            label: isKn ? "ಸಾವಯವ ಕೀಟನಾಶಕ" : "Organic Pest Control",
+            prompt: isKn ? "ರಾಸಾಯನಿಕ ಮುಕ್ತ ಸಾವಯವ ಕೀಟನಾಶಕ ಮತ್ತು ನೀಮ್ ಕಷಾಯ ತಯಾರಿಸುವ ವಿಧಾನ ತಿಳಿಸಿ." : "How to prepare effective organic neem-based pest control remedies at home?"
+        },
+        {
+            icon: <Building2 className="w-4 h-4 text-purple-400" />,
+            label: isKn ? "ಸರ್ಕಾರಿ ಸೌಲಭ್ಯಗಳು" : "Govt Subsidies (Kisan)",
+            prompt: isKn ? "ರೈತರಿಗಾಗಿ ಲಭ್ಯವಿರುವ ಪ್ರಮುಖ ಕೃಷಿ ಯೋಜನೆಗಳು, ಸಬ್ಸಿಡಿಗಳು ಮತ್ತು ಪಿಎಂ ಕಿಸಾನ್ ಪ್ರಯೋಜನಗಳ ಮಾಹಿತಿ ನೀಡಿ." : "What government schemes, subsidies, and PM-Kisan financial aids are available for farmers?"
+        }
+    ];
+
+    return (
+        <div 
+            className="relative w-full h-full min-h-screen bg-cover bg-center flex flex-col justify-between p-4 sm:p-6 overflow-y-auto galaxy-scrollbar"
+            style={{
+                backgroundImage: "url('https://cdn.21st.dev/assets/mirror/c3/c333918af688a4a8a3d004652e6c0ee219457a9d84d380eeb31f513d4b59a09f.png')",
+                backgroundAttachment: "fixed"
+            }}
+        >
+            <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px] pointer-events-none" />
+
+            {/* Top Navigation Bar */}
+            <header className="relative z-10 w-full max-w-5xl mx-auto flex items-center justify-between py-2">
                 <div className="flex items-center gap-2">
-                    {onClose && (
-                        <button
-                            onClick={onClose}
-                            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white border border-white/10 transition-colors text-xs flex items-center gap-1.5 font-mono"
-                            aria-label="Close Assistant"
-                        >
-                            <ArrowLeftIcon className="w-4 h-4" />
-                            <span className="hidden sm:inline">{isKn ? "ಮುಖ್ಯ ಪುಟ" : "Back to Home"}</span>
-                        </button>
-                    )}
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
+                        <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <span className="font-bold text-white text-base tracking-wide">Bhoomi AI</span>
+                        <span className="text-xs text-neutral-400 block font-mono">AgriVerse Intelligence</span>
+                    </div>
                 </div>
 
-                {/* Demo Quota Badge */}
-                {isDemoMode && (
-                    <div className="flex items-center gap-2">
-                        {remainingPrompts > 0 ? (
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono font-medium animate-pulse shadow-sm">
-                                <SparklesIcon className="w-3.5 h-3.5 text-blue-400" />
-                                <span>
-                                    {isKn 
-                                        ? `ಉಚಿತ ಡೆಮೊ: ${remainingPrompts}/${DEMO_PROMPT_LIMIT} ಪ್ರಶ್ನೆಗಳು ಬಾಕಿ`
-                                        : `Free Demo: ${remainingPrompts}/${DEMO_PROMPT_LIMIT} prompts left`}
-                                </span>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={onRequireAuth}
-                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-red-500/20 border border-amber-500/40 text-amber-300 hover:text-white text-xs font-mono font-bold transition-all shadow-sm cursor-pointer"
-                            >
-                                <span>🔒 {isKn ? "ಮಿತಿ ಮುಗಿದಿದೆ • ಸೈನ್ ಇನ್ ಮಾಡಿ" : "Limit Reached • Sign In"}</span>
-                            </button>
-                        )}
-                    </div>
-                )}
+                <div className="flex items-center gap-2.5">
+                    {isDemoMode && (
+                        <div className={cn(
+                            "px-3 py-1 rounded-full text-xs font-mono font-medium border backdrop-blur-md",
+                            isQuotaLocked
+                                ? "bg-red-500/20 border-red-500/40 text-red-300"
+                                : "bg-emerald-500/20 border-emerald-500/30 text-emerald-300"
+                        )}>
+                            {isQuotaLocked ? "🔒 Limit Reached" : `⚡ Demo: ${remainingPrompts}/3 prompts`}
+                        </div>
+                    )}
 
-                <div className="flex items-center gap-2">
-                    <LanguageToggle currentLanguage={currentLanguage} setCurrentLanguage={setCurrentLanguage} size="sm" />
+                    {/* Language Switcher */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentLanguage(isKn ? Language.EN : Language.KN)}
+                        className="rounded-full border-neutral-700 bg-black/50 text-xs font-mono text-neutral-200 hover:text-white hover:bg-neutral-800"
+                    >
+                        {isKn ? "English" : "ಕನ್ನಡ"}
+                    </Button>
+
                     {onClose && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={onClose}
-                            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white border border-white/10 transition-colors"
+                            className="rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800/80"
                             aria-label="Close"
                         >
-                            <XCircleIcon className="w-5 h-5" />
-                        </button>
+                            <X className="w-5 h-5" />
+                        </Button>
                     )}
                 </div>
-            </div>
+            </header>
 
-            <div className="flex-1 flex flex-col justify-center items-center text-center z-10 relative">
+            {/* Center Content Section */}
+            <main className="relative z-10 w-full max-w-3xl mx-auto flex-1 flex flex-col items-center justify-center my-6 text-center">
+                {/* Glowing Badge */}
                 <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 1, type: "spring" }}
-                    className="mb-8 relative"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-4 shadow-lg backdrop-blur-md"
                 >
-                    <div className="absolute -inset-4 bg-gradient-to-r from-green-400 to-blue-500 rounded-full blur-3xl opacity-20 animate-pulse"></div>
-                    <h1 className="text-8xl md:text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-300 via-blue-400 to-purple-500 drop-shadow-[0_0_15px_rgba(56,189,248,0.5)]">
-                        BHOOMI
-                    </h1>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span>{isKn ? "ಕೃಷಿ AI ಸಹಾಯಕ" : "Next-Gen Farm Intelligence"}</span>
                 </motion.div>
 
-                <motion.p
-                    initial={{ opacity: 0, y: 20 }}
+                {/* Hero Title */}
+                <motion.h1
+                    initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.7, delay: 0.2 }}
-                    className="mt-2 max-w-xl text-xl text-blue-100/80 font-light tracking-wide"
+                    transition={{ delay: 0.1 }}
+                    className="text-4xl sm:text-5xl font-bold tracking-tight text-white drop-shadow-md"
                 >
-                    {texts.assistantWelcome}
+                    {isKn ? "ಭೂಮಿ AI ಗೆ ಸುಸ್ವಾಗತ" : "Ask Bhoomi AI"}
+                </motion.h1>
+
+                <motion.p
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 }}
+                    className="mt-2.5 text-sm sm:text-base text-neutral-300 max-w-xl font-light leading-relaxed"
+                >
+                    {isKn 
+                        ? "ಬೆಳೆ ರೋಗ ಪರೀಕ್ಷೆ, ಮಾರುಕಟ್ಟೆ ದರಗಳು ಮತ್ತು ಕೃಷಿ ಸಲಹೆಗಳನ್ನು ಕನ್ನಡದಲ್ಲೇ ಧ್ವನಿ ಅಥವಾ ಪಠ್ಯದ ಮೂಲಕ ಪಡೆಯಿರಿ."
+                        : "Ask anything about crop diagnosis, live mandi prices, soil health, and weather in English or Kannada."}
                 </motion.p>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.7, delay: 0.4 }}
-                    className="mt-16 w-full max-w-3xl"
-                >
-                    <h2 className="text-4xl md:text-5xl font-semibold text-white mb-10 tracking-tight">
-                        How can I help you today?
-                    </h2>
+                {/* Daily Agricultural Fact Pill */}
+                {texts.agriculturalFacts && texts.agriculturalFacts.length > 0 && (
+                    <motion.div
+                        key={factIndex}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="mt-4 px-4 py-2 rounded-2xl bg-neutral-900/60 border border-neutral-800/80 text-xs text-neutral-300 max-w-lg flex items-center gap-2 backdrop-blur-md shadow-inner"
+                    >
+                        <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="truncate">{texts.agriculturalFacts[factIndex]}</span>
+                    </motion.div>
+                )}
 
-                    <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="relative group">
-                        <div className="relative flex items-center input-field-glow rounded-2xl p-2 transition-all duration-300 group-hover:shadow-[0_0_30px_rgba(168,85,247,0.15)]">
-                            <input
-                                type="text"
+                {/* Center Auto-Expanding Input Container */}
+                <div className="w-full mt-8">
+                    <form onSubmit={handleSubmit} className="relative">
+                        <div className={cn(
+                            "relative bg-black/75 backdrop-blur-2xl rounded-2xl border transition-all shadow-2xl p-2",
+                            isQuotaLocked
+                                ? "border-red-500/40 bg-red-950/20"
+                                : "border-neutral-700/80 focus-within:border-emerald-500/60 focus-within:ring-1 focus-within:ring-emerald-500/30"
+                        )}>
+                            {/* Attachment Thumbnail Preview if file attached */}
+                            {attachment && (
+                                <div className="flex items-center gap-2 p-2 mb-1 bg-neutral-900/90 rounded-xl border border-neutral-800 w-fit">
+                                    {attachmentPreview ? (
+                                        <img src={attachmentPreview} alt="upload preview" className="w-10 h-10 object-cover rounded-lg border border-neutral-700" />
+                                    ) : (
+                                        <Paperclip className="w-5 h-5 text-neutral-400" />
+                                    )}
+                                    <span className="text-xs text-neutral-200 max-w-[150px] truncate">{attachment.name}</span>
+                                    <button type="button" onClick={handleRemoveAttachment} className="p-1 hover:text-red-400 text-neutral-400">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Auto Resizing Textarea */}
+                            <Textarea
+                                ref={textareaRef}
                                 value={userInput}
-                                onChange={(e) => setUserInput(e.target.value)}
-                                placeholder={isTranscribing ? "Recognizing speech with Sarvam AI..." : isRecording ? "Listening... Click mic again to stop" : isDemoMode && remainingPrompts === 0 ? "Demo limit reached. Click Sign In to continue." : texts.messagePlaceholder}
-                                disabled={isDemoMode && remainingPrompts === 0}
-                                className="relative w-full pl-6 pr-40 py-4 bg-transparent text-white placeholder-blue-200/50 text-lg border-none focus:ring-0 focus:outline-none disabled:opacity-60"
+                                onChange={(e) => {
+                                    setUserInput(e.target.value);
+                                    adjustHeight();
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSubmit();
+                                    }
+                                }}
+                                disabled={isRecording || isQuotaLocked}
+                                placeholder={
+                                    isQuotaLocked
+                                        ? isKn ? "ಉಚಿತ ಡೆಮೊ ಮಿತಿ ತಲುಪಿದೆ. ಮುಂದುವರಿಯಲು ಸೈನ್ ಇನ್ ಮಾಡಿ." : "Free demo limit reached. Sign In to continue."
+                                        : isTranscribing
+                                        ? "Recognizing speech with Sarvam AI..."
+                                        : isRecording
+                                        ? "Listening... Click mic again to finish"
+                                        : isKn ? "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಿ ಅಥವಾ ಮಾತನಾಡಿ..." : "Ask your crop question, paste image, or click mic..."
+                                }
+                                className={cn(
+                                    "w-full px-4 py-2 resize-none border-none",
+                                    "bg-transparent text-white text-sm sm:text-base",
+                                    "focus-visible:ring-0 focus-visible:ring-offset-0",
+                                    "placeholder:text-neutral-500 min-h-[52px]"
+                                )}
+                                style={{ overflow: "hidden" }}
                             />
-                            <div className="absolute top-1/2 right-3 transform -translate-y-1/2 flex items-center gap-2">
-                                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*,application/pdf,.doc,.docx" />
 
-                                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isRecording || (isDemoMode && remainingPrompts === 0)} className="p-3 rounded-xl text-blue-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40" aria-label={texts.attachFile}>
-                                    <PaperClipIcon className="w-6 h-6" />
-                                </button>
+                            {/* Hidden file input */}
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                accept="image/*"
+                                className="hidden"
+                            />
 
-                                <button
-                                    type="button"
-                                    onClick={onToggleRecording}
-                                    disabled={isDemoMode && remainingPrompts === 0}
-                                    className={`p-3 rounded-xl transition-all disabled:opacity-40 ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40 ring-2 ring-red-400' : isTranscribing ? 'bg-purple-600 text-white animate-spin' : 'text-blue-300 hover:text-white hover:bg-white/10'}`}
-                                    aria-label={texts.askWithVoice}
-                                >
-                                    <MicrophoneIcon className="w-6 h-6" />
-                                </button>
+                            {/* Bottom Input Controls Toolbar */}
+                            <div className="flex items-center justify-between pt-1 px-2 pb-1">
+                                <div className="flex items-center gap-1.5">
+                                    {/* Attach Image Button */}
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isRecording || isQuotaLocked}
+                                        className="text-neutral-400 hover:text-white hover:bg-neutral-800/80 rounded-xl"
+                                        title={texts.attachFile}
+                                    >
+                                        <Paperclip className="w-5 h-5" />
+                                    </Button>
 
-                                <button type="submit" disabled={(!userInput.trim() && !attachment) || (isDemoMode && remainingPrompts === 0)} className="p-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:shadow-none transition-all transform hover:scale-105">
-                                    <PaperAirplaneIcon className="w-6 h-6" />
-                                </button>
+                                    {/* Microphone Voice Button */}
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={onToggleRecording}
+                                        disabled={isQuotaLocked}
+                                        className={cn(
+                                            "rounded-xl transition-all",
+                                            isRecording
+                                                ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50"
+                                                : isTranscribing
+                                                ? "bg-purple-600 text-white animate-spin"
+                                                : "text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800/80"
+                                        )}
+                                        title={isRecording ? "Stop Recording" : "Voice Input"}
+                                    >
+                                        <Mic className="w-5 h-5" />
+                                    </Button>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    {isQuotaLocked ? (
+                                        <Button
+                                            type="button"
+                                            onClick={onRequireAuth}
+                                            className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-lg"
+                                        >
+                                            {isKn ? "ಸೈನ್ ಇನ್" : "Sign In"}
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            type="submit"
+                                            disabled={!userInput.trim() && !attachment}
+                                            className={cn(
+                                                "px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-lg",
+                                                (userInput.trim() || attachment)
+                                                    ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/20"
+                                                    : "bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                                            )}
+                                        >
+                                            <ArrowUp className="w-4 h-4" />
+                                            <span className="text-xs font-medium hidden sm:inline">{isKn ? "ಕಳುಹಿಸಿ" : "Send"}</span>
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </form>
 
-                    {attachment && (
-                        <div className="mt-4 text-left animate-fade-in-up">
-                            <div className="inline-flex items-center justify-between bg-white/10 border border-white/10 backdrop-blur-md text-blue-100 px-4 py-2 rounded-xl text-sm shadow-lg">
-                                <PaperClipIcon className="w-4 h-4 mr-2 text-blue-400" />
-                                <span className="truncate max-w-[200px] font-medium">{attachment.name}</span>
-                                <button onClick={() => setAttachment(null)} className="ml-3 text-blue-300 hover:text-white transition-colors"><XCircleIcon className="w-5 h-5" /></button>
-                            </div>
-                        </div>
-                    )}
-                    {speechError && <div className="mt-3 text-red-300 text-sm font-medium bg-red-900/30 py-1 px-3 rounded-lg inline-block">{speechError}</div>}
-                </motion.div>
-            </div>
-
-            <div className="h-24 flex flex-col justify-end items-center text-center z-10 relative pb-4">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={factIndex}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.5 }}
-                        className="glass-panel px-6 py-3 rounded-full"
-                    >
-                        <p className={`text-sm text-blue-200/80 max-w-2xl ${currentLanguage === 'kn' ? 'font-kannada' : ''}`}>
-                            <SparklesIcon className="w-4 h-4 inline mr-2 text-yellow-400" />
-                            {texts.agriculturalFacts[factIndex]}
+                    {speechError && (
+                        <p className="mt-2 text-xs text-red-400 text-center font-medium bg-red-950/40 py-1 px-3 rounded-full border border-red-500/20 inline-block">
+                            {speechError}
                         </p>
-                    </motion.div>
-                </AnimatePresence>
-            </div>
+                    )}
+                </div>
+
+                {/* Quick Action Suggestion Pills Grid */}
+                <div className="w-full flex items-center justify-center flex-wrap gap-2.5 mt-8">
+                    {quickActions.map((action, idx) => (
+                        <QuickActionPill
+                            key={idx}
+                            icon={action.icon}
+                            label={action.label}
+                            onClick={() => handleQuickAction(action.prompt)}
+                            disabled={isQuotaLocked}
+                        />
+                    ))}
+                </div>
+            </main>
+
+            {/* Bottom Footer Credits */}
+            <footer className="relative z-10 w-full max-w-3xl mx-auto text-center py-2 text-xs font-mono text-neutral-500">
+                AgriVerse Bhoomi AI • Powered by Gemini 2.5 Flash & Sarvam Voice AI
+            </footer>
         </div>
     );
 };
 
-// Assistant Chat Screen
+// Redesigned Chat Conversation Screen
 const ChatScreen: React.FC<{
     texts: UIStringContent;
     currentLanguage: Language;
     history: ChatMessage[];
     isLoading: boolean;
-    onSendMessage: (m: string, a: File | null) => void;
+    onSendMessage: (p: string, a: File | null) => void;
     isVoiceEnabled: boolean;
-    setIsVoiceEnabled: (e: boolean) => void;
+    setIsVoiceEnabled: (enabled: boolean) => void;
     isRecording: boolean;
     isTranscribing: boolean;
     onToggleRecording: () => void;
     isSpeaking: boolean;
     onCancelSpeak: () => void;
-    setCurrentLanguage: (l: Language) => void;
+    setCurrentLanguage: (lang: Language) => void;
     onGoHome: () => void;
     speechError: string | null;
     isDemoMode?: boolean;
     demoCount: number;
     onRequireAuth?: () => void;
     onClose?: () => void;
-}> = (props) => {
-    const {
-        texts, currentLanguage, history, isLoading, onSendMessage,
-        isVoiceEnabled, setIsVoiceEnabled, isRecording, isTranscribing,
-        onToggleRecording, isSpeaking, onCancelSpeak, setCurrentLanguage,
-        onGoHome, speechError, isDemoMode, demoCount, onRequireAuth, onClose
-    } = props;
+}> = ({
+    texts, currentLanguage, history, isLoading, onSendMessage,
+    isVoiceEnabled, setIsVoiceEnabled, isRecording, isTranscribing,
+    onToggleRecording, isSpeaking, onCancelSpeak, setCurrentLanguage,
+    onGoHome, speechError, isDemoMode, demoCount, onRequireAuth, onClose
+}) => {
     const [userInput, setUserInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
+    const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+    const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const chatContainerRef = useRef<HTMLDivElement>(null);
-    const [displayLang, setDisplayLang] = useState<Language>(currentLanguage);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+
+    const { textareaRef, adjustHeight } = useAutoResizeTextarea({
+        minHeight: 48,
+        maxHeight: 140
+    });
 
     const isKn = currentLanguage === Language.KN;
     const remainingPrompts = Math.max(0, DEMO_PROMPT_LIMIT - demoCount);
+    const isQuotaLocked = isDemoMode && remainingPrompts === 0;
 
     useEffect(() => {
-        if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }, [history]);
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [history, isLoading]);
 
-    const handleSendClick = () => {
-        if (userInput.trim() || attachment) {
-            onSendMessage(userInput, attachment);
-            setUserInput('');
-            setAttachment(null);
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setAttachment(file);
+            try {
+                const preview = await fileToDataURL(file);
+                setAttachmentPreview(preview);
+            } catch {
+                setAttachmentPreview(null);
+            }
         }
     };
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) setAttachment(e.target.files[0]);
+
+    const handleRemoveAttachment = () => {
+        setAttachment(null);
+        setAttachmentPreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const isGenerating = isLoading && history.length > 0 && history[history.length - 1].role === 'user';
+    const handleSubmit = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (isQuotaLocked) {
+            onRequireAuth?.();
+            return;
+        }
+        if (userInput.trim() || attachment) {
+            onSendMessage(userInput.trim(), attachment);
+            setUserInput('');
+            setAttachment(null);
+            setAttachmentPreview(null);
+            adjustHeight(true);
+        }
+    };
+
+    const handleCopy = (text: string, idx: number) => {
+        navigator.clipboard.writeText(text);
+        setCopiedIndex(idx);
+        setTimeout(() => setCopiedIndex(null), 2500);
+    };
 
     return (
-        <div className="flex flex-col h-full bhoomi-galaxy-container text-white overflow-hidden">
-            <div className="stars-bg"></div>
+        <div 
+            className="relative w-full h-full flex flex-col justify-between bg-cover bg-center overflow-hidden"
+            style={{
+                backgroundImage: "url('https://cdn.21st.dev/assets/mirror/c3/c333918af688a4a8a3d004652e6c0ee219457a9d84d380eeb31f513d4b59a09f.png')",
+                backgroundAttachment: "fixed"
+            }}
+        >
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-[3px] pointer-events-none" />
 
-            <header className="flex-shrink-0 glass-panel p-4 z-20 rounded-t-xl relative">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Button onClick={onGoHome} variant="subtle" size="sm" className="!text-blue-200 hover:!text-white hover:!bg-white/10 !rounded-xl">
-                            <ArrowLeftIcon className="w-5 h-5" />
-                        </Button>
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                <span className="font-bold text-white text-lg">B</span>
+            {/* Chat Floating Header */}
+            <header className="relative z-10 w-full px-4 py-3 border-b border-neutral-800/80 bg-black/60 backdrop-blur-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onGoHome}
+                        className="rounded-xl text-neutral-300 hover:text-white hover:bg-neutral-800"
+                        title="Back to Home"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                    </Button>
+
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                            <Sparkles className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="font-bold text-white text-sm sm:text-base">Bhoomi AI</h2>
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                             </div>
-                            <div>
-                                <h3 className="font-bold text-white text-lg leading-tight">Bhoomi AI</h3>
-                                <p className="text-xs text-blue-300 flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                                    {isDemoMode ? (isKn ? "ಉಚಿತ ಡೆಮೊ" : "Free Demo Mode") : "Online"}
-                                </p>
-                            </div>
+                            <p className="text-[11px] text-neutral-400 font-mono">
+                                {isKn ? "ಕೃಷಿ ತಜ್ಞ ಸಹಾಯಕ" : "AgriVerse AI Expert"}
+                            </p>
                         </div>
                     </div>
+                </div>
 
-                    {/* Center: Demo Badge */}
+                <div className="flex items-center gap-2">
                     {isDemoMode && (
-                        <div className="hidden sm:flex items-center">
-                            {remainingPrompts > 0 ? (
-                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono font-medium shadow-sm">
-                                    <SparklesIcon className="w-3.5 h-3.5 text-blue-400" />
-                                    <span>
-                                        {isKn 
-                                            ? `${remainingPrompts}/${DEMO_PROMPT_LIMIT} ಪ್ರಶ್ನೆಗಳು ಬಾಕಿ`
-                                            : `${remainingPrompts}/${DEMO_PROMPT_LIMIT} prompts left`}
-                                    </span>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={onRequireAuth}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:text-white text-xs font-mono font-bold transition-all cursor-pointer shadow-sm"
-                                >
-                                    <span>🔒 {isKn ? "ಸೈನ್ ಇನ್ ಮಾಡಿ" : "Sign In to Continue"}</span>
-                                </button>
-                            )}
+                        <div className={cn(
+                            "px-2.5 py-1 rounded-full text-xs font-mono font-medium border backdrop-blur-md hidden sm:block",
+                            isQuotaLocked
+                                ? "bg-red-500/20 border-red-500/40 text-red-300"
+                                : "bg-emerald-500/20 border-emerald-500/30 text-emerald-300"
+                        )}>
+                            {isQuotaLocked ? "🔒 Limit Reached" : `⚡ ${remainingPrompts}/3 Left`}
                         </div>
                     )}
 
-                    <div className="flex items-center gap-3">
-                        <LanguageToggle currentLanguage={currentLanguage} setCurrentLanguage={setCurrentLanguage} />
-
-                        {isSpeaking ? (
-                            <Button
-                                onClick={onCancelSpeak}
-                                variant="danger"
-                                size="sm"
-                                className="!rounded-full !pl-3 !pr-4 !bg-red-500/80 hover:!bg-red-600 backdrop-blur-md border border-red-400/30 animate-pulse shadow-lg shadow-red-500/20"
-                                aria-label={texts.cancelVoiceOutput}
-                                leftIcon={<SpeakerXMarkIcon className="w-5 h-5" />}
-                            >
-                                <span className="hidden sm:inline">{texts.cancel}</span>
-                            </Button>
-                        ) : (
-                            <Button
-                                onClick={() => setIsVoiceEnabled(!isVoiceEnabled)}
-                                variant="subtle"
-                                size="sm"
-                                className={`!rounded-full !p-2 hover:!bg-white/10 border ${isVoiceEnabled ? 'border-green-500/30 bg-green-500/10 !text-green-400' : 'border-white/10 !text-gray-400'}`}
-                                aria-label={texts.voiceOutput}
-                            >
-                                {isVoiceEnabled ? <SpeakerWaveIcon className="w-5 h-5" /> : <SpeakerXMarkIcon className="w-5 h-5" />}
-                            </Button>
+                    {/* Auto-read Voice Speaker Toggle */}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                            if (isSpeaking) onCancelSpeak();
+                            setIsVoiceEnabled(!isVoiceEnabled);
+                        }}
+                        className={cn(
+                            "rounded-xl transition-all",
+                            isVoiceEnabled ? "text-emerald-400 bg-emerald-500/10" : "text-neutral-500 hover:text-neutral-300"
                         )}
+                        title={isVoiceEnabled ? "Voice Enabled" : "Voice Muted"}
+                    >
+                        {isVoiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                    </Button>
 
-                        {onClose && (
-                            <button
-                                onClick={onClose}
-                                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white border border-white/10 transition-colors"
-                                aria-label="Close"
-                            >
-                                <XCircleIcon className="w-5 h-5" />
-                            </button>
-                        )}
-                    </div>
+                    {/* Language Switcher */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentLanguage(isKn ? Language.EN : Language.KN)}
+                        className="rounded-full border-neutral-700 bg-black/50 text-xs font-mono text-neutral-200 hover:text-white hover:bg-neutral-800"
+                    >
+                        {isKn ? "EN" : "ಕನ್ನಡ"}
+                    </Button>
+
+                    {onClose && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onClose}
+                            className="rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800"
+                        >
+                            <X className="w-5 h-5" />
+                        </Button>
+                    )}
                 </div>
             </header>
 
-            <main ref={chatContainerRef} className="flex-grow p-4 overflow-y-auto galaxy-scrollbar relative z-10">
-                <div className="max-w-4xl mx-auto space-y-8 pb-4">
-                    <AnimatePresence>
-                        {history.map((msg, index) => {
-                            const isLastMessage = index === history.length - 1;
-                            const isCurrentlySpeaking = isLastMessage && msg.role === 'model' && isSpeaking;
+            {/* Chat Messages Flow */}
+            <div className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 galaxy-scrollbar max-w-4xl w-full mx-auto">
+                {history.map((message, idx) => {
+                    const isUser = message.role === 'user';
+                    return (
+                        <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={cn(
+                                "flex gap-3",
+                                isUser ? "justify-end" : "justify-start"
+                            )}
+                        >
+                            {/* AI Avatar */}
+                            {!isUser && (
+                                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/20 mt-1">
+                                    <Sparkles className="w-4 h-4" />
+                                </div>
+                            )}
 
-                            return (
-                                <motion.div
-                                    key={msg.id}
-                                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    transition={{ duration: 0.4, ease: "easeOut" }}
-                                >
-                                    <div className={`flex flex-col max-w-[85%] md:max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                        <div className={`flex items-center gap-2 mb-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg transition-all duration-300 ${msg.role === 'model' ? 'bg-gradient-to-br from-emerald-400 via-cyan-500 to-blue-600 text-white' : 'bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 text-white'} ${isCurrentlySpeaking ? 'speaking-indicator ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-900' : ''}`}>
-                                                {msg.role === 'model' ? <SparklesIcon className={`w-4 h-4 ${isCurrentlySpeaking ? 'animate-pulse' : ''}`} /> : <UserCircleIcon className="w-5 h-5" />}
-                                            </div>
-                                            <span className={`text-xs font-medium ${msg.role === 'model' ? 'text-cyan-300/80' : 'text-purple-300/80'}`}>{msg.role === 'model' ? 'Bhoomi AI' : 'You'}</span>
-                                            {isCurrentlySpeaking && <SpeakerWaveIcon className="w-4 h-4 text-cyan-400 animate-pulse" />}
+                            <div className={cn(
+                                "max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 shadow-xl backdrop-blur-xl relative group",
+                                isUser 
+                                    ? "bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-tr-sm border border-emerald-400/30"
+                                    : "bg-neutral-900/90 text-neutral-100 rounded-tl-sm border border-neutral-800/90"
+                            )}>
+                                {/* User Uploaded Attachment in Chat */}
+                                {message.attachment && (
+                                    <div className="mb-3 rounded-xl overflow-hidden border border-white/20 max-w-xs shadow-md">
+                                        <img 
+                                            src={typeof message.attachment === 'string' ? message.attachment : URL.createObjectURL(message.attachment)} 
+                                            alt="Crop Upload" 
+                                            className="w-full h-auto object-cover max-h-60"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Message Content */}
+                                <div className="text-sm sm:text-base leading-relaxed break-words">
+                                    <MarkdownRenderer content={message.parts[0]?.text || ''} />
+                                </div>
+
+                                {/* Plant Disease Diagnostic Card if available */}
+                                {message.plantAnalysis && (
+                                    <div className="mt-4 pt-3 border-t border-neutral-700/60">
+                                        <PlantAnalysisResult result={message.plantAnalysis} texts={texts} />
+                                    </div>
+                                )}
+
+                                {/* Copy / Actions bar on AI messages */}
+                                {!isUser && (
+                                    <div className="mt-3 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-xs text-neutral-400">
+                                        <div className="flex items-center gap-2">
+                                            {isSpeaking && (
+                                                <span className="flex items-center gap-1.5 text-emerald-400 font-mono">
+                                                    <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+                                                    <span>Speaking...</span>
+                                                </span>
+                                            )}
                                         </div>
-
-                                        <div className={`rounded-2xl p-5 ${msg.role === 'user' ? 'msg-bubble-user text-white rounded-tr-none' : 'msg-bubble-ai text-gray-100 rounded-tl-none'}`}>
-                                            {/* MODEL RESPONSE: ANALYSIS REPORT */}
-                                            {msg.role === 'model' && msg.analysisReport && history[index - 1]?.attachment?.dataUrl && (
-                                                <div className="bg-white/5 rounded-xl overflow-hidden border border-white/10">
-                                                    <div className="relative">
-                                                        <div className="absolute top-2 right-2 flex items-center bg-black/40 backdrop-blur-md rounded-full p-1 z-10 border border-white/10">
-                                                            <button onClick={() => setDisplayLang(Language.EN)} className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${displayLang === Language.EN ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white'}`}>EN</button>
-                                                            <button onClick={() => setDisplayLang(Language.KN)} className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${displayLang === Language.KN ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white'}`}>KN</button>
-                                                        </div>
-                                                        <PlantAnalysisResult
-                                                            result={msg.analysisReport}
-                                                            uploadedImage={history[index - 1].attachment!.dataUrl!}
-                                                            texts={texts}
-                                                            language={displayLang}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* MODEL RESPONSE: TEXT */}
-                                            {msg.role === 'model' && !msg.analysisReport && msg.text && (
-                                                <MarkdownRenderer content={msg.text} language={currentLanguage} />
-                                            )}
-
-                                            {/* USER MESSAGE */}
-                                            {msg.role === 'user' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCopy(message.parts[0]?.text || '', idx)}
+                                            className="flex items-center gap-1 hover:text-white text-neutral-400 transition-colors p-1"
+                                            title="Copy answer"
+                                        >
+                                            {copiedIndex === idx ? (
                                                 <>
-                                                    {msg.text && <MarkdownRenderer content={msg.text} language={currentLanguage} />}
-                                                    {msg.attachment?.dataUrl && (
-                                                        <div className="mt-3 relative group">
-                                                            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                                                            <img src={msg.attachment.dataUrl} alt={msg.attachment.name} className="relative rounded-lg max-w-xs max-h-60 border border-white/20 shadow-lg" />
-                                                        </div>
-                                                    )}
-                                                    {msg.attachment && !msg.attachment.dataUrl && (
-                                                        <div className="mt-2 inline-flex items-center gap-2 bg-white/20 text-white px-4 py-2 rounded-xl text-sm border border-white/10">
-                                                            <PaperClipIcon className="w-4 h-4" /><span className="truncate">{msg.attachment.name}</span>
-                                                        </div>
-                                                    )}
+                                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                                    <span className="text-emerald-400">Copied</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                    <span>Copy</span>
                                                 </>
                                             )}
-                                        </div>
+                                        </button>
                                     </div>
-                                </motion.div>
-                            );
-                        })}
-                    </AnimatePresence>
-                    {isGenerating && (
-                        <motion.div
-                            className="flex justify-start"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                        >
-                            <div className="msg-bubble-ai rounded-2xl rounded-tl-none p-5 flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-                                    <div className="w-2.5 h-2.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                                    <div className="w-2.5 h-2.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                                )}
+                            </div>
+
+                            {/* User Avatar */}
+                            {isUser && (
+                                <div className="w-8 h-8 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center text-neutral-300 shrink-0 shadow-lg mt-1">
+                                    <UserCircle2 className="w-5 h-5" />
                                 </div>
-                                <span className="text-sm text-gray-400 animate-pulse">Bhoomi is thinking...</span>
-                            </div>
+                            )}
                         </motion.div>
-                    )}
-                </div>
-            </main>
+                    );
+                })}
 
-            <footer className="input-glow-container p-4 z-20 relative">
-                <div className="max-w-4xl mx-auto">
-                    {attachment && (
-                        <div className="mb-3 animate-fade-in-up">
-                            <div className="inline-flex items-center justify-between bg-blue-500/20 border border-blue-500/30 text-blue-100 px-4 py-2 rounded-xl text-sm backdrop-blur-md">
-                                <PaperClipIcon className="w-4 h-4 mr-2" />
-                                <span className="truncate max-w-[200px]">{attachment.name}</span>
-                                <button onClick={() => setAttachment(null)} className="ml-3 text-blue-300 hover:text-white"><XCircleIcon className="w-5 h-5" /></button>
-                            </div>
+                {/* Loading / Generating Animation */}
+                {isLoading && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex gap-3 items-center"
+                    >
+                        <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                            <Sparkles className="w-4 h-4 animate-spin" />
                         </div>
-                    )}
+                        <div className="px-4 py-3 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-neutral-300 backdrop-blur-md shadow-lg flex items-center gap-3">
+                            <GeneratingAnimation />
+                            <span className="text-xs font-mono text-neutral-400">
+                                {isKn ? "ಭೂಮಿ AI ಯೋಚಿಸುತ್ತಿದೆ..." : "Bhoomi AI is analyzing..."}
+                            </span>
+                        </div>
+                    </motion.div>
+                )}
 
-                    <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-2 backdrop-blur-md shadow-xl">
-                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*,application/pdf,.doc,.docx" />
+                <div ref={chatEndRef} />
+            </div>
 
-                        <button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="p-3 rounded-xl text-blue-300 hover:text-white hover:bg-white/10 transition-colors" aria-label={texts.attachFile}>
-                            <PaperClipIcon className="w-6 h-6" />
-                        </button>
+            {/* Floating Bottom Input Dock */}
+            <footer className="relative z-10 w-full max-w-4xl mx-auto p-4 sm:p-6">
+                <form onSubmit={handleSubmit} className="relative">
+                    <div className={cn(
+                        "relative bg-black/80 backdrop-blur-2xl rounded-2xl border transition-all shadow-2xl p-2",
+                        isQuotaLocked
+                            ? "border-red-500/40 bg-red-950/20"
+                            : "border-neutral-700/80 focus-within:border-emerald-500/60 focus-within:ring-1 focus-within:ring-emerald-500/30"
+                    )}>
+                        {/* Attachment Thumbnail Preview */}
+                        {attachment && (
+                            <div className="flex items-center gap-2 p-2 mb-1 bg-neutral-900/90 rounded-xl border border-neutral-800 w-fit">
+                                {attachmentPreview ? (
+                                    <img src={attachmentPreview} alt="upload preview" className="w-10 h-10 object-cover rounded-lg border border-neutral-700" />
+                                ) : (
+                                    <Paperclip className="w-5 h-5 text-neutral-400" />
+                                )}
+                                <span className="text-xs text-neutral-200 max-w-[150px] truncate">{attachment.name}</span>
+                                <button type="button" onClick={handleRemoveAttachment} className="p-1 hover:text-red-400 text-neutral-400">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
 
-                        <input
+                        {/* Auto-Resizing Textarea */}
+                        <Textarea
+                            ref={textareaRef}
                             value={userInput}
-                            onChange={e => setUserInput(e.target.value)}
-                            onKeyPress={e => e.key === 'Enter' && !isLoading && handleSendClick()}
-                            placeholder={isTranscribing ? "Recognizing speech with Sarvam AI..." : isRecording ? "Listening... Click mic to send" : texts.messagePlaceholder}
-                            disabled={isLoading || isTranscribing}
-                            className="flex-grow px-3 py-2 text-base bg-transparent border-none focus:outline-none focus:ring-0 text-white placeholder-blue-200/50"
+                            onChange={(e) => {
+                                setUserInput(e.target.value);
+                                adjustHeight();
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSubmit();
+                                }
+                            }}
+                            disabled={isRecording || isQuotaLocked}
+                            placeholder={
+                                isQuotaLocked
+                                    ? isKn ? "ಉಚಿತ ಡೆಮೊ ಮಿತಿ ತಲುಪಿದೆ. ಮುಂದುವರಿಯಲು ಸೈನ್ ಇನ್ ಮಾಡಿ." : "Free demo limit reached. Sign In to continue."
+                                    : isTranscribing
+                                    ? "Recognizing speech with Sarvam AI..."
+                                    : isRecording
+                                    ? "Listening... Click mic again to finish"
+                                    : isKn ? "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಿ..." : "Ask your crop question or click mic..."
+                            }
+                            className={cn(
+                                "w-full px-4 py-2 resize-none border-none",
+                                "bg-transparent text-white text-sm sm:text-base",
+                                "focus-visible:ring-0 focus-visible:ring-offset-0",
+                                "placeholder:text-neutral-500 min-h-[48px]"
+                            )}
+                            style={{ overflow: "hidden" }}
                         />
 
-                        <div className="h-8 w-[1px] bg-white/10 mx-1"></div>
+                        {/* Hidden file input */}
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept="image/*"
+                            className="hidden"
+                        />
 
-                        <button 
-                            type="button"
-                            onClick={onToggleRecording} 
-                            disabled={isLoading || isTranscribing} 
-                            className={`p-3 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40 ring-2 ring-red-400' : isTranscribing ? 'bg-purple-600 text-white animate-spin' : 'text-blue-300 hover:text-white hover:bg-white/10'}`} 
-                            aria-label={texts.askWithVoice}
-                        >
-                            <MicrophoneIcon className="w-6 h-6" />
-                        </button>
+                        {/* Footer Controls */}
+                        <div className="flex items-center justify-between pt-1 px-2 pb-1">
+                            <div className="flex items-center gap-1.5">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isRecording || isQuotaLocked}
+                                    className="text-neutral-400 hover:text-white hover:bg-neutral-800/80 rounded-xl"
+                                    title={texts.attachFile}
+                                >
+                                    <Paperclip className="w-5 h-5" />
+                                </Button>
 
-                        <button onClick={handleSendClick} disabled={isLoading || (!userInput.trim() && !attachment)} className="p-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:shadow-none transition-all transform hover:scale-105">
-                            <PaperAirplaneIcon className="w-6 h-6" />
-                        </button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={onToggleRecording}
+                                    disabled={isQuotaLocked}
+                                    className={cn(
+                                        "rounded-xl transition-all",
+                                        isRecording
+                                            ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50"
+                                            : isTranscribing
+                                            ? "bg-purple-600 text-white animate-spin"
+                                            : "text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800/80"
+                                    )}
+                                    title={isRecording ? "Stop Recording" : "Voice Input"}
+                                >
+                                    <Mic className="w-5 h-5" />
+                                </Button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                {isQuotaLocked ? (
+                                    <Button
+                                        type="button"
+                                        onClick={onRequireAuth}
+                                        className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-lg"
+                                    >
+                                        {isKn ? "ಸೈನ್ ಇನ್" : "Sign In"}
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        type="submit"
+                                        disabled={!userInput.trim() && !attachment}
+                                        className={cn(
+                                            "px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-lg",
+                                            (userInput.trim() || attachment)
+                                                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/20"
+                                                : "bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                                        )}
+                                    >
+                                        <ArrowUp className="w-4 h-4" />
+                                        <span className="text-xs font-medium hidden sm:inline">{isKn ? "ಕಳುಹಿಸಿ" : "Send"}</span>
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
                     </div>
+                </form>
 
-                    {speechError && <p className="mt-2 text-xs text-red-400 text-center font-medium">{speechError}</p>}
-                </div>
+                {speechError && (
+                    <p className="mt-2 text-xs text-red-400 text-center font-medium bg-red-950/40 py-1 px-3 rounded-full border border-red-500/20 inline-block">
+                        {speechError}
+                    </p>
+                )}
             </footer>
         </div>
     );
@@ -1020,7 +1409,6 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     const isPlayingAudioRef = useRef<boolean>(false);
     const currentSessionIdRef = useRef<number>(0);
 
-    // Initial load/cleanup
     useEffect(() => {
         setHistory([]);
         return () => {
@@ -1032,34 +1420,17 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         };
     }, []);
 
-    // Get or initialize AudioContext
     const getAudioContext = (): AudioContext => {
         if (!audioContextRef.current) {
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             audioContextRef.current = new AudioContextClass();
         }
         if (audioContextRef.current.state === 'suspended') {
-            audioContextRef.current.resume();
+            audioContextRef.current.resume().catch(err => console.error("AudioContext resume error:", err));
         }
         return audioContextRef.current;
     };
 
-    // Native browser Web Speech API fallback
-    const speakBrowserFallback = useCallback((text: string, onEnd: () => void) => {
-        if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = currentLanguage === Language.KN ? 'kn-IN' : 'en-IN';
-            utterance.rate = 1.0;
-            utterance.pitch = 1.05;
-            utterance.onend = () => onEnd();
-            utterance.onerror = () => onEnd();
-            window.speechSynthesis.speak(utterance);
-        } else {
-            onEnd();
-        }
-    }, [currentLanguage]);
-
-    // Stop speaking, clear state and increment session ID to invalidate pending TTS requests
     const handleCancelSpeak = useCallback(() => {
         currentSessionIdRef.current += 1;
         playlistRef.current = [];
@@ -1067,144 +1438,132 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         isPlayingAudioRef.current = false;
         setIsSpeaking(false);
 
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-        }
-
         if (activeSourceNodeRef.current) {
             try {
                 activeSourceNodeRef.current.stop();
-            } catch (e) {
-                // Ignore if already stopped
-            }
+                activeSourceNodeRef.current.disconnect();
+            } catch {}
             activeSourceNodeRef.current = null;
         }
     }, []);
 
-    // Core play PCM or WAV via Web Audio API
-    const playAudioBuffer = async (base64Data: string, isWav: boolean, text: string, sessionId: number) => {
+    const playNextAudio = useCallback(async (sessionId: number) => {
+        if (sessionId !== currentSessionIdRef.current) return;
+
+        const nextIndex = nextPlayIndexRef.current;
+        const item = playlistRef.current.find(i => i.index === nextIndex);
+
+        if (!item) {
+            isPlayingAudioRef.current = false;
+            setIsSpeaking(false);
+            return;
+        }
+
+        if (item.status === 'pending') {
+            isPlayingAudioRef.current = true;
+            setIsSpeaking(true);
+            return;
+        }
+
+        if (item.status === 'failed' || !item.base64Data) {
+            nextPlayIndexRef.current += 1;
+            playNextAudio(sessionId);
+            return;
+        }
+
         isPlayingAudioRef.current = true;
         setIsSpeaking(true);
 
         try {
-            const audioCtx = getAudioContext();
-            const arrayBuffer = base64ToArrayBuffer(base64Data);
-            let audioBuffer: AudioBuffer;
+            const ctx = getAudioContext();
+            const arrayBuffer = base64ToArrayBuffer(item.base64Data);
 
-            if (isWav) {
-                // Sarvam AI returns standard WAV audio
-                audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            let audioBuffer: AudioBuffer;
+            if (item.isWav) {
+                audioBuffer = await ctx.decodeAudioData(arrayBuffer);
             } else {
-                // Gemini TTS returns raw 24kHz PCM16 audio
                 const float32Data = convertPCM16ToFloat32(arrayBuffer);
-                audioBuffer = audioCtx.createBuffer(1, float32Data.length, 24000);
+                audioBuffer = ctx.createBuffer(1, float32Data.length, 24000);
                 audioBuffer.copyToChannel(float32Data, 0);
             }
 
-            if (currentSessionIdRef.current !== sessionId) return;
+            if (sessionId !== currentSessionIdRef.current) return;
 
-            const source = audioCtx.createBufferSource();
+            const source = ctx.createBufferSource();
             source.buffer = audioBuffer;
-            source.connect(audioCtx.destination);
+            source.connect(ctx.destination);
             activeSourceNodeRef.current = source;
 
             source.onended = () => {
-                if (currentSessionIdRef.current !== sessionId) return;
-                activeSourceNodeRef.current = null;
-                isPlayingAudioRef.current = false;
-                processPlaylist(sessionId);
+                if (sessionId === currentSessionIdRef.current) {
+                    activeSourceNodeRef.current = null;
+                    nextPlayIndexRef.current += 1;
+                    playNextAudio(sessionId);
+                }
             };
 
             source.start(0);
-        } catch (err) {
-            console.warn("AudioBuffer decode error, falling back to Web Speech:", err);
-            speakBrowserFallback(text, () => {
-                if (currentSessionIdRef.current === sessionId) {
-                    isPlayingAudioRef.current = false;
-                    processPlaylist(sessionId);
+        } catch (error) {
+            console.error("Audio playback error:", error);
+            if (sessionId === currentSessionIdRef.current) {
+                nextPlayIndexRef.current += 1;
+                playNextAudio(sessionId);
+            }
+        }
+    }, []);
+
+    const queueSpeech = useCallback((text: string, index: number, sessionId: number) => {
+        if (!isVoiceEnabled || sessionId !== currentSessionIdRef.current) return;
+
+        playlistRef.current.push({
+            index,
+            text,
+            status: 'pending'
+        });
+
+        (async () => {
+            try {
+                let base64Audio = await generateSarvamSpeech(text, currentLanguage);
+                let isWav = true;
+
+                if (!base64Audio) {
+                    base64Audio = await generateSpeech(text, currentLanguage);
+                    isWav = false;
                 }
-            });
-        }
-    };
 
-    // Play next item in the playlist
-    const processPlaylist = useCallback((sessionId: number) => {
-        if (currentSessionIdRef.current !== sessionId) return;
-        if (isPlayingAudioRef.current) return;
+                if (sessionId !== currentSessionIdRef.current) return;
 
-        const nextItem = playlistRef.current.find(p => p.index === nextPlayIndexRef.current);
-        if (!nextItem) {
-            const allCompleted = playlistRef.current.every(p => p.status === 'resolved' || p.status === 'failed');
-            if (allCompleted && playlistRef.current.length > 0) {
-                setIsSpeaking(false);
-            }
-            return;
-        }
-
-        if (nextItem.status === 'resolved' && nextItem.base64Data) {
-            nextPlayIndexRef.current++;
-            playAudioBuffer(nextItem.base64Data, !!nextItem.isWav, nextItem.text, sessionId);
-        } else if (nextItem.status === 'failed') {
-            nextPlayIndexRef.current++;
-            // Use instant browser speech synthesis fallback for failed chunks
-            isPlayingAudioRef.current = true;
-            setIsSpeaking(true);
-            speakBrowserFallback(nextItem.text, () => {
-                if (currentSessionIdRef.current === sessionId) {
-                    isPlayingAudioRef.current = false;
-                    processPlaylist(sessionId);
+                const targetItem = playlistRef.current.find(i => i.index === index);
+                if (targetItem) {
+                    if (base64Audio) {
+                        targetItem.base64Data = base64Audio;
+                        targetItem.isWav = isWav;
+                        targetItem.status = 'resolved';
+                    } else {
+                        targetItem.status = 'failed';
+                    }
                 }
-            });
-        }
-    }, [speakBrowserFallback]);
 
-    // Async fetch TTS chunk from Sarvam AI with fallback to Gemini TTS
-    const fetchSpeech = async (text: string, index: number, sessionId: number) => {
-        try {
-            // 1. Primary: Sarvam AI Bulbul (ultra-natural Indian conversational voice)
-            let base64 = await generateSarvamSpeech(text, currentLanguage);
-            let isWav = true;
-
-            // 2. Secondary: Gemini 2.5 Flash TTS
-            if (!base64) {
-                base64 = await generateSpeech(text);
-                isWav = false;
+                if (!isPlayingAudioRef.current && nextPlayIndexRef.current === index) {
+                    playNextAudio(sessionId);
+                } else if (isPlayingAudioRef.current && nextPlayIndexRef.current === index) {
+                    playNextAudio(sessionId);
+                }
+            } catch (err) {
+                console.error("Speech synthesis error for chunk:", err);
+                const targetItem = playlistRef.current.find(i => i.index === index);
+                if (targetItem) targetItem.status = 'failed';
+                if (nextPlayIndexRef.current === index) {
+                    nextPlayIndexRef.current += 1;
+                    playNextAudio(sessionId);
+                }
             }
+        })();
+    }, [currentLanguage, isVoiceEnabled, playNextAudio]);
 
-            if (currentSessionIdRef.current !== sessionId) return;
+    const handleSendMessage = useCallback(async (prompt: string, attachment: File | null) => {
+        if ((!prompt && !attachment) || isLoading || isSendingRef.current) return;
 
-            const entry = playlistRef.current.find(p => p.index === index);
-            if (entry) {
-                entry.base64Data = base64 || undefined;
-                entry.isWav = isWav;
-                entry.status = base64 ? 'resolved' : 'failed';
-            }
-            processPlaylist(sessionId);
-        } catch (err) {
-            console.error(`[TTS Fetch Error] Index: ${index}`, err);
-            if (currentSessionIdRef.current !== sessionId) return;
-
-            const entry = playlistRef.current.find(p => p.index === index);
-            if (entry) {
-                entry.status = 'failed';
-            }
-            processPlaylist(sessionId);
-        }
-    };
-
-    // Single-shot queue speech (for disease detection summary)
-    const queueSpeech = useCallback((text: string) => {
-        if (!text || !text.trim()) return;
-        const sessionId = currentSessionIdRef.current;
-        const idx = playlistRef.current.length;
-        playlistRef.current.push({ index: idx, text, status: 'pending' });
-        fetchSpeech(text, idx, sessionId);
-    }, [currentLanguage]);
-
-    const handleSendMessage = useCallback(async (message: string, attachment: File | null) => {
-        if (isSendingRef.current || isLoading) return;
-
-        // Check if Demo Quota limit reached
         if (isDemoMode && demoCount >= DEMO_PROMPT_LIMIT) {
             setShowAuthGate(true);
             return;
@@ -1217,172 +1576,154 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         }
 
         isSendingRef.current = true;
-        handleCancelSpeak(); // Clear previous speech & reset session
+        handleCancelSpeak();
         setCurrentView('chat');
         setIsLoading(true);
 
-        const userMessage: ChatMessage = { id: `user-${Date.now()}`, role: 'user', text: message };
-        if (attachment) {
-            const dataUrl = await fileToDataURL(attachment);
-            userMessage.attachment = { name: attachment.name, type: attachment.type, dataUrl };
-        }
-        setHistory(prev => [...prev, userMessage]);
+        const newSessionId = currentSessionIdRef.current;
 
-        // Specific logic for plant disease analysis
-        if (attachment?.type.startsWith('image/')) {
-            try {
-                const base64Image = await fileToBase64(attachment);
-                const analysisReport = await getPlantDiseaseAnalysis(base64Image, attachment.type);
-                const modelMessage: ChatMessage = { id: `model-${Date.now()}`, role: 'model', text: '', analysisReport };
-                setHistory(prev => [...prev, modelMessage]);
-                // Speak summary if voice is enabled
-                if (isVoiceEnabled && analysisReport) {
-                    const summary = analysisReport.isDiseaseFound ?
-                        `${analysisReport.diseaseName[currentLanguage]} detected. Severity is ${analysisReport.severity[currentLanguage]}.` :
-                        "The plant appears to be healthy.";
-                    queueSpeech(summary);
-                }
-            } catch (e: any) {
-                setHistory(prev => [...prev, { id: `model-err-${Date.now()}`, role: 'model', text: `${texts.errorPrefix} ${e.message}` }]);
-            } finally {
-                setIsLoading(false);
-                isSendingRef.current = false;
-            }
-            return;
-        }
+        const userMessage: ChatMessage = {
+            role: 'user',
+            parts: [{ text: prompt }],
+            attachment: attachment ? attachment : undefined,
+        };
 
-        // Standard text-based chat with Ultra-Fast Groq / Gemini Streaming & Sentence TTS Pipelining
+        const currentHistory = [...history, userMessage];
+        setHistory(currentHistory);
+
+        const modelMessagePlaceholder: ChatMessage = {
+            role: 'model',
+            parts: [{ text: '' }],
+        };
+        setHistory([...currentHistory, modelMessagePlaceholder]);
+
         try {
-            const modelMessageId = `model-${Date.now()}`;
-            setHistory(prev => [...prev, { id: modelMessageId, role: 'model', text: '' }]);
+            if (attachment) {
+                const imageBase64 = await fileToBase64(attachment);
+                const analysisResult = await getPlantDiseaseAnalysis(
+                    imageBase64,
+                    attachment.type,
+                    currentLanguage,
+                    prompt
+                );
 
-            // Initialize/unlock audio context on user interaction
-            if (isVoiceEnabled) {
+                const botResponseText = analysisResult.disease
+                    ? `### ${analysisResult.disease}\n\n**${texts.diagnosisConfidence}:** ${analysisResult.confidence}\n\n**${texts.organicRemedy}:**\n${analysisResult.treatment.organic}\n\n**${texts.chemicalRemedy}:**\n${analysisResult.treatment.chemical}\n\n**${texts.preventiveMeasures}:**\n${analysisResult.treatment.prevention}`
+                    : analysisResult.rawAnalysis || texts.noDiseaseFound;
+
+                setHistory(prev => {
+                    const next = [...prev];
+                    next[next.length - 1] = {
+                        role: 'model',
+                        parts: [{ text: botResponseText }],
+                        plantAnalysis: analysisResult,
+                    };
+                    return next;
+                });
+
+                if (isVoiceEnabled) {
+                    const clean = removeMarkdown(botResponseText).slice(0, 300);
+                    queueSpeech(clean, 0, newSessionId);
+                }
+            } else {
+                let accumulatedFullText = '';
+                let sentenceBuffer = '';
+                let chunkIndex = 0;
+
+                const sentenceEndRegex = /([.!?\n\u0964\u0965]+|\.\s+|\?\s+|\!\s+)/;
+
+                let streamSuccess = false;
                 try {
-                    getAudioContext();
-                } catch (e) {
-                    console.warn("Failed to unlock AudioContext:", e);
-                }
-            }
+                    const stream = await getBhoomiResponseStream(currentHistory, prompt, currentLanguage, user);
+                    for await (const chunk of stream) {
+                        if (newSessionId !== currentSessionIdRef.current) break;
+                        const chunkText = chunk.text || '';
+                        accumulatedFullText += chunkText;
+                        sentenceBuffer += chunkText;
 
-            let fullResponse = '';
-            let chunkBuffer = '';
-            let sentenceIndex = 0;
-            const sessionIdAtStreamStart = currentSessionIdRef.current;
-
-            // Try Groq streaming first (sub-200ms latency)
-            let usedGroq = false;
-            try {
-                const groqStream = getGroqBhoomiStream(
-                    [...history, userMessage],
-                    currentLanguage
-                );
-
-                for await (const chunk of groqStream) {
-                    usedGroq = true;
-                    if (currentSessionIdRef.current !== sessionIdAtStreamStart) break;
-
-                    const text = chunk.text;
-                    if (text) {
-                        fullResponse += text;
-                        chunkBuffer += text;
-
-                        // Update UI immediately (streaming response)
-                        setHistory(prev => prev.map(m => m.id === modelMessageId ? { ...m, text: fullResponse } : m));
+                        setHistory(prev => {
+                            const next = [...prev];
+                            next[next.length - 1] = {
+                                role: 'model',
+                                parts: [{ text: accumulatedFullText }],
+                            };
+                            return next;
+                        });
 
                         if (isVoiceEnabled) {
-                            const delimiters = /[.?!।\n]/;
-                            if (delimiters.test(chunkBuffer)) {
-                                const parts = chunkBuffer.split(/([.?!।\n])/);
-                                while (parts.length > 2) {
-                                    const sentenceText = (parts.shift() || '') + (parts.shift() || '');
-                                    const trimmed = sentenceText.trim();
-                                    if (trimmed && trimmed.length > 1) {
-                                        const plainSentence = removeMarkdown(trimmed)
-                                            .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
-                                            .trim();
-                                        
-                                        if (plainSentence) {
-                                            const idx = sentenceIndex++;
-                                            playlistRef.current.push({ index: idx, text: plainSentence, status: 'pending' });
-                                            fetchSpeech(plainSentence, idx, sessionIdAtStreamStart);
-                                        }
-                                    }
+                            const parts = sentenceBuffer.split(sentenceEndRegex);
+                            if (parts.length > 2) {
+                                const completeSentence = parts.slice(0, -1).join('').trim();
+                                sentenceBuffer = parts[parts.length - 1];
+
+                                const cleanSentence = removeMarkdown(completeSentence).trim();
+                                if (cleanSentence.length > 3) {
+                                    queueSpeech(cleanSentence, chunkIndex, newSessionId);
+                                    chunkIndex++;
                                 }
-                                chunkBuffer = parts.join('');
+                            }
+                        }
+                    }
+                    streamSuccess = true;
+                } catch (geminiError) {
+                    console.warn("Gemini Stream failed, falling back to Groq stream:", geminiError);
+                }
+
+                if (!streamSuccess) {
+                    const groqStream = await getGroqBhoomiStream(currentHistory, prompt, currentLanguage, user);
+                    for await (const chunk of groqStream) {
+                        if (newSessionId !== currentSessionIdRef.current) break;
+                        const chunkText = chunk.text || '';
+                        accumulatedFullText += chunkText;
+                        sentenceBuffer += chunkText;
+
+                        setHistory(prev => {
+                            const next = [...prev];
+                            next[next.length - 1] = {
+                                role: 'model',
+                                parts: [{ text: accumulatedFullText }],
+                            };
+                            return next;
+                        });
+
+                        if (isVoiceEnabled) {
+                            const parts = sentenceBuffer.split(sentenceEndRegex);
+                            if (parts.length > 2) {
+                                const completeSentence = parts.slice(0, -1).join('').trim();
+                                sentenceBuffer = parts[parts.length - 1];
+
+                                const cleanSentence = removeMarkdown(completeSentence).trim();
+                                if (cleanSentence.length > 3) {
+                                    queueSpeech(cleanSentence, chunkIndex, newSessionId);
+                                    chunkIndex++;
+                                }
                             }
                         }
                     }
                 }
-            } catch (groqErr) {
-                console.warn("Groq streaming failed, falling back to Gemini 2.5 Flash:", groqErr);
-            }
 
-            // Fallback to Gemini 2.5 Flash if Groq was not used or failed before producing tokens
-            if (!usedGroq || !fullResponse) {
-                fullResponse = '';
-                chunkBuffer = '';
-                const responseStream = await getBhoomiResponseStream(
-                    [...history, userMessage],
-                    currentLanguage
-                );
-
-                for await (const chunk of responseStream) {
-                    if (currentSessionIdRef.current !== sessionIdAtStreamStart) break;
-
-                    const text = chunk.text;
-                    if (text) {
-                        fullResponse += text;
-                        chunkBuffer += text;
-
-                        setHistory(prev => prev.map(m => m.id === modelMessageId ? { ...m, text: fullResponse } : m));
-
-                        if (isVoiceEnabled) {
-                            const delimiters = /[.?!।\n]/;
-                            if (delimiters.test(chunkBuffer)) {
-                                const parts = chunkBuffer.split(/([.?!।\n])/);
-                                while (parts.length > 2) {
-                                    const sentenceText = (parts.shift() || '') + (parts.shift() || '');
-                                    const trimmed = sentenceText.trim();
-                                    if (trimmed && trimmed.length > 1) {
-                                        const plainSentence = removeMarkdown(trimmed)
-                                            .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
-                                            .trim();
-                                        
-                                        if (plainSentence) {
-                                            const idx = sentenceIndex++;
-                                            playlistRef.current.push({ index: idx, text: plainSentence, status: 'pending' });
-                                            fetchSpeech(plainSentence, idx, sessionIdAtStreamStart);
-                                        }
-                                    }
-                                }
-                                chunkBuffer = parts.join('');
-                            }
-                        }
+                if (isVoiceEnabled && sentenceBuffer.trim() && newSessionId === currentSessionIdRef.current) {
+                    const cleanSentence = removeMarkdown(sentenceBuffer).trim();
+                    if (cleanSentence.length > 1) {
+                        queueSpeech(cleanSentence, chunkIndex, newSessionId);
                     }
                 }
             }
-
-            // Flush remaining buffer after stream finishes
-            if (isVoiceEnabled && chunkBuffer.trim() && currentSessionIdRef.current === sessionIdAtStreamStart) {
-                const plainSentence = removeMarkdown(chunkBuffer)
-                    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
-                    .trim();
-                if (plainSentence) {
-                    const idx = sentenceIndex++;
-                    playlistRef.current.push({ index: idx, text: plainSentence, status: 'pending' });
-                    fetchSpeech(plainSentence, idx, sessionIdAtStreamStart);
-                }
-            }
-
-        } catch (e: any) {
-            console.error("Streaming Error:", e);
-            setHistory(prev => [...prev, { id: `model-err-${Date.now()}`, role: 'model', text: `${texts.errorPrefix} ${e.message}` }]);
+        } catch (error) {
+            console.error("Error in handleSendMessage:", error);
+            setHistory(prev => {
+                const next = [...prev];
+                next[next.length - 1] = {
+                    role: 'model',
+                    parts: [{ text: texts.errorAssistant }],
+                };
+                return next;
+            });
         } finally {
             setIsLoading(false);
             isSendingRef.current = false;
         }
-    }, [currentLanguage, history, isVoiceEnabled, queueSpeech, texts, isLoading, isDemoMode, demoCount]);
+    }, [currentLanguage, history, isVoiceEnabled, queueSpeech, texts, isLoading, isDemoMode, demoCount, user]);
 
     const handleVoiceResult = useCallback((transcript: string) => {
         if (transcript && transcript.trim()) {
@@ -1422,10 +1763,10 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     };
 
     return (
-        <div className="w-full h-full relative">
+        <div className="w-full h-full relative overflow-hidden">
             <AnimatePresence mode="wait">
                 {currentView === 'home' ? (
-                    <motion.div key="home" className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <motion.div key="home" className="h-full w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                         <AssistantHomeScreen
                             user={user}
                             texts={texts}
@@ -1446,7 +1787,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                         />
                     </motion.div>
                 ) : (
-                    <motion.div key="chat" className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <motion.div key="chat" className="h-full w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                         <ChatScreen
                             texts={texts}
                             currentLanguage={currentLanguage}
