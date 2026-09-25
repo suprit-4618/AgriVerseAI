@@ -151,34 +151,34 @@ const encodeWAV = (samples: Float32Array, sampleRate: number = 16000): Blob => {
     return new Blob([view], { type: 'audio/wav' });
 };
 
-// High-Accuracy Dual-Tier Speech Recognition Hook
-const useVoiceSpeechRecognition = (
-    onResult: (t: string) => void,
-    onRecordingChange: (recording: boolean) => void,
-    onTranscribingChange: (transcribing: boolean) => void,
-    onError: (e: string) => void,
-    onInterimResult: (interim: string) => void,
-    lang: Language
-) => {
+// Real-Time In-Input Speech-to-Text Dictation Hook (WebSpeech API + 16kHz WAV Sarvam STT Fallback)
+const useSpeechDictation = ({
+    lang,
+    onTextChange,
+    getCurrentText,
+    onCancelAudio
+}: {
+    lang: Language;
+    onTextChange: (text: string) => void;
+    getCurrentText: () => string;
+    onCancelAudio?: () => void;
+}) => {
+    const [isListening, setIsListening] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
+    const [speechError, setSpeechError] = useState<string | null>(null);
+
     const recognitionRef = useRef<any>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const audioChunksRef = useRef<Float32Array[]>([]);
     const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
-    const silenceTimeoutRef = useRef<any>(null);
-    const transcriptRef = useRef<string>('');
-    const isRecordingRef = useRef<boolean>(false);
+    const baseTextRef = useRef<string>('');
+    const isListeningRef = useRef<boolean>(false);
     const activeMethodRef = useRef<'webspeech' | 'audioContext' | null>(null);
 
-    const cleanupAudio = useCallback(() => {
-        if (silenceTimeoutRef.current) {
-            clearTimeout(silenceTimeoutRef.current);
-            silenceTimeoutRef.current = null;
-        }
+    const cleanup = useCallback(() => {
         if (scriptProcessorRef.current) {
-            try {
-                scriptProcessorRef.current.disconnect();
-            } catch {}
+            try { scriptProcessorRef.current.disconnect(); } catch {}
             scriptProcessorRef.current = null;
         }
         if (mediaStreamRef.current) {
@@ -186,31 +186,27 @@ const useVoiceSpeechRecognition = (
             mediaStreamRef.current = null;
         }
         if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-            try {
-                audioContextRef.current.close();
-            } catch {}
+            try { audioContextRef.current.close(); } catch {}
             audioContextRef.current = null;
+        }
+        if (recognitionRef.current) {
+            try { recognitionRef.current.stop(); } catch {}
+            recognitionRef.current = null;
         }
     }, []);
 
-    const stopRecording = useCallback(async () => {
-        if (!isRecordingRef.current) return;
-        isRecordingRef.current = false;
-        onRecordingChange(false);
+    const stopListening = useCallback(async () => {
+        if (!isListeningRef.current) return;
+        isListeningRef.current = false;
+        setIsListening(false);
 
         if (activeMethodRef.current === 'webspeech' && recognitionRef.current) {
-            try {
-                recognitionRef.current.stop();
-            } catch {}
-            const final = transcriptRef.current.trim();
-            if (final) {
-                onResult(final);
-            }
+            try { recognitionRef.current.stop(); } catch {}
         } else if (activeMethodRef.current === 'audioContext') {
-            cleanupAudio();
+            cleanup();
             const totalSamples = audioChunksRef.current.reduce((acc, c) => acc + c.length, 0);
             if (totalSamples > 8000) {
-                onTranscribingChange(true);
+                setIsTranscribing(true);
                 try {
                     const merged = new Float32Array(totalSamples);
                     let offset = 0;
@@ -220,29 +216,28 @@ const useVoiceSpeechRecognition = (
                     }
                     const wavBlob = encodeWAV(merged, 16000);
                     const sarvamTranscript = await transcribeSarvamAudio(wavBlob, lang);
-                    onTranscribingChange(false);
+                    setIsTranscribing(false);
                     if (sarvamTranscript && sarvamTranscript.trim()) {
-                        onResult(sarvamTranscript.trim());
-                    } else {
-                        onError(lang === Language.KN ? "ಧ್ವನಿ ಸ್ಪಷ್ಟವಾಗಿ ಕೇಳಿಸಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ." : "No speech detected. Please speak closer to the mic.");
+                        const base = baseTextRef.current.trim();
+                        const result = base ? `${base} ${sarvamTranscript.trim()}` : sarvamTranscript.trim();
+                        onTextChange(result);
                     }
-                } catch (err: any) {
-                    onTranscribingChange(false);
+                } catch (err) {
+                    setIsTranscribing(false);
                     console.warn("Sarvam STT fallback error:", err);
-                    onError(lang === Language.KN ? "ಧ್ವನಿ ಗುರುತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಟೈಪ್ ಮಾಡಿ." : "Speech recognition failed. Please try typing.");
                 }
-            } else {
-                onError(lang === Language.KN ? "ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ. ಮೈಕ್ ಹತ್ತಿರ ಮಾತನಾಡಿ." : "No audio detected. Please speak into the mic.");
             }
         }
-        cleanupAudio();
-    }, [cleanupAudio, lang, onRecordingChange, onResult, onTranscribingChange, onError]);
+        cleanup();
+    }, [cleanup, lang, onTextChange]);
 
-    const startRecording = useCallback(async () => {
-        cleanupAudio();
-        transcriptRef.current = '';
-        onInterimResult('');
-        isRecordingRef.current = true;
+    const startListening = useCallback(async () => {
+        cleanup();
+        onCancelAudio?.();
+        setSpeechError(null);
+        baseTextRef.current = getCurrentText();
+        isListeningRef.current = true;
+        setIsListening(true);
 
         const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -252,72 +247,44 @@ const useVoiceSpeechRecognition = (
                 const recognition = new SpeechRec();
                 recognitionRef.current = recognition;
                 recognition.lang = lang === Language.KN ? 'kn-IN' : 'en-IN';
-                recognition.continuous = false;
+                recognition.continuous = true;
                 recognition.interimResults = true;
                 recognition.maxAlternatives = 1;
 
-                recognition.onstart = () => {
-                    onRecordingChange(true);
-                };
-
                 recognition.onresult = (event: any) => {
-                    let interimText = '';
-                    let finalText = '';
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        const transcriptPart = event.results[i][0].transcript;
-                        if (event.results[i].isFinal) {
-                            finalText += transcriptPart;
-                        } else {
-                            interimText += transcriptPart;
-                        }
+                    let fullSpoken = '';
+                    for (let i = 0; i < event.results.length; i++) {
+                        fullSpoken += event.results[i][0].transcript;
                     }
-                    if (finalText) {
-                        transcriptRef.current = finalText;
-                        onInterimResult(finalText);
-                    } else if (interimText) {
-                        transcriptRef.current = interimText;
-                        onInterimResult(interimText);
-                    }
+                    const base = baseTextRef.current.trim();
+                    const combined = base ? `${base} ${fullSpoken.trim()}` : fullSpoken.trim();
+                    onTextChange(combined);
                 };
 
                 recognition.onerror = (event: any) => {
                     console.warn("WebSpeech recognition error:", event.error);
                     if (event.error === 'not-allowed') {
-                        onError(lang === Language.KN ? "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ಅಗತ್ಯವಿದೆ." : "Microphone permission is required to use voice input.");
-                        isRecordingRef.current = false;
-                        onRecordingChange(false);
-                    } else if (event.error === 'no-speech') {
-                        onError(lang === Language.KN ? "ಯಾವುದೇ ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ." : "No speech detected. Please speak closer to the mic.");
-                        isRecordingRef.current = false;
-                        onRecordingChange(false);
+                        setSpeechError(lang === Language.KN ? "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ನೀಡಿ." : "Microphone permission denied.");
+                        isListeningRef.current = false;
+                        setIsListening(false);
                     }
                 };
 
                 recognition.onend = () => {
-                    if (isRecordingRef.current) {
-                        isRecordingRef.current = false;
-                        onRecordingChange(false);
-                        const result = transcriptRef.current.trim();
-                        if (result) {
-                            onResult(result);
-                        }
+                    if (isListeningRef.current) {
+                        isListeningRef.current = false;
+                        setIsListening(false);
                     }
                 };
 
                 recognition.start();
-
-                silenceTimeoutRef.current = setTimeout(() => {
-                    if (isRecordingRef.current) {
-                        stopRecording();
-                    }
-                }, 10000);
-
                 return;
             } catch (recErr) {
-                console.warn("SpeechRecognition init failed, switching to AudioContext 16kHz WAV + Sarvam AI:", recErr);
+                console.warn("SpeechRecognition init failed, falling back to AudioContext + Sarvam AI:", recErr);
             }
         }
 
+        // Fallback: AudioContext + 16kHz WAV + Sarvam STT
         try {
             activeMethodRef.current = 'audioContext';
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -341,45 +308,43 @@ const useVoiceSpeechRecognition = (
             audioChunksRef.current = [];
 
             processor.onaudioprocess = (e) => {
-                if (!isRecordingRef.current) return;
+                if (!isListeningRef.current) return;
                 const channelData = e.inputBuffer.getChannelData(0);
                 audioChunksRef.current.push(new Float32Array(channelData));
             };
 
             source.connect(processor);
             processor.connect(audioCtx.destination);
-
-            onRecordingChange(true);
-
-            silenceTimeoutRef.current = setTimeout(() => {
-                if (isRecordingRef.current) {
-                    stopRecording();
-                }
-            }, 8000);
-
         } catch (mediaErr: any) {
             console.error("Microphone access error:", mediaErr);
-            isRecordingRef.current = false;
-            onRecordingChange(false);
-            onError(lang === Language.KN ? "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ಅಗತ್ಯವಿದೆ." : "Microphone access denied. Please allow microphone access in your browser.");
+            isListeningRef.current = false;
+            setIsListening(false);
+            setSpeechError(lang === Language.KN ? "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ನೀಡಿ." : "Microphone access denied.");
         }
-    }, [cleanupAudio, lang, onInterimResult, onRecordingChange, onError, stopRecording, onResult]);
+    }, [cleanup, getCurrentText, lang, onCancelAudio, onTextChange]);
 
-    const toggleRecording = useCallback((isCurrentlyRecording: boolean) => {
-        if (isCurrentlyRecording) {
-            stopRecording();
+    const toggleListening = useCallback(() => {
+        if (isListeningRef.current) {
+            stopListening();
         } else {
-            startRecording();
+            startListening();
         }
-    }, [startRecording, stopRecording]);
+    }, [startListening, stopListening]);
 
     useEffect(() => {
         return () => {
-            cleanupAudio();
+            cleanup();
         };
-    }, [cleanupAudio]);
+    }, [cleanup]);
 
-    return { startRecording, stopRecording, toggleRecording };
+    return {
+        isListening,
+        isTranscribing,
+        speechError,
+        startListening,
+        stopListening,
+        toggleListening,
+    };
 };
 
 const DEMO_PROMPT_LIMIT = 3;
@@ -466,75 +431,6 @@ interface BhoomiAssistantProps {
     onClose?: () => void;
 }
 
-// Listening View (Celestial Monochrome Glass Fullscreen Modal)
-const ListeningView: React.FC<{
-    texts: UIStringContent;
-    speechError: string | null;
-    isTranscribing?: boolean;
-    liveTranscript?: string;
-    onStop?: () => void;
-}> = ({ texts, speechError, isTranscribing, liveTranscript, onStop }) => {
-    return (
-        <motion.div
-            key="listening-view"
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-3xl backdrop-blur-2xl bg-black/90 cursor-pointer select-none px-4"
-            onClick={onStop}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.3 } }}
-            transition={{ duration: 0.2 }}
-        >
-            <motion.p
-                className="text-white text-2xl sm:text-3xl font-light mb-6 tracking-wide text-center"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
-            >
-                {isTranscribing ? "Recognizing speech with Sarvam AI..." : texts.listening}
-            </motion.p>
-
-            {liveTranscript && liveTranscript.trim() ? (
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-lg w-full mx-4 mb-6 px-6 py-4 rounded-2xl bg-neutral-900 border border-neutral-700 shadow-2xl backdrop-blur-md text-center"
-                >
-                    <p className="text-xs font-mono text-neutral-400 mb-1 uppercase tracking-wider">🎙️ Spoken Words:</p>
-                    <p className="text-lg font-medium text-white italic">"{liveTranscript}"</p>
-                </motion.div>
-            ) : (
-                <ListeningAnimation />
-            )}
-
-            <motion.div
-                className="absolute bottom-12 flex flex-col items-center gap-3"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: { delay: 0.2 } }}
-            >
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onStop?.();
-                    }}
-                    className="w-20 h-20 bg-white hover:bg-neutral-200 text-black rounded-full flex items-center justify-center shadow-2xl animate-pulse hover:scale-105 active:scale-95 transition-transform"
-                    aria-label="Stop recording"
-                >
-                    <Mic className="w-10 h-10 text-black" />
-                </button>
-                <span className="text-xs sm:text-sm text-neutral-300 font-medium bg-black/70 px-4 py-1.5 rounded-full backdrop-blur-sm border border-neutral-800">
-                    Click anywhere or mic when finished speaking
-                </span>
-            </motion.div>
-
-            {speechError && (
-                <div className="absolute top-8 mx-4 text-sm text-red-200 bg-neutral-900 border border-red-500/50 px-6 py-3 rounded-xl backdrop-blur-md shadow-2xl">
-                    {speechError}
-                </div>
-            )}
-        </motion.div>
-    );
-};
-
 // Redesigned Monochrome Quick Action Pill Component
 interface QuickActionPillProps {
     icon: React.ReactNode;
@@ -564,19 +460,15 @@ const AssistantHomeScreen: React.FC<{
     texts: UIStringContent;
     currentLanguage: Language;
     onStartConversation: (p: string, a: File | null) => void;
-    isRecording: boolean;
-    isTranscribing: boolean;
-    onToggleRecording: () => void;
-    speechError: string | null;
     isDemoMode?: boolean;
     demoCount: number;
     onRequireAuth?: () => void;
     onClose?: () => void;
     setCurrentLanguage: (lang: Language) => void;
+    onCancelAudio?: () => void;
 }> = ({ 
-    user, texts, currentLanguage, onStartConversation, isRecording, 
-    isTranscribing, onToggleRecording, speechError, isDemoMode, 
-    demoCount, onRequireAuth, onClose, setCurrentLanguage 
+    user, texts, currentLanguage, onStartConversation, isDemoMode, 
+    demoCount, onRequireAuth, onClose, setCurrentLanguage, onCancelAudio 
 }) => {
     const [userInput, setUserInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
@@ -592,6 +484,22 @@ const AssistantHomeScreen: React.FC<{
     const isKn = currentLanguage === Language.KN;
     const remainingPrompts = Math.max(0, DEMO_PROMPT_LIMIT - demoCount);
     const isQuotaLocked = isDemoMode && remainingPrompts === 0;
+
+    const {
+        isListening,
+        isTranscribing,
+        speechError,
+        toggleListening,
+        stopListening
+    } = useSpeechDictation({
+        lang: currentLanguage,
+        onTextChange: (newText) => {
+            setUserInput(newText);
+            setTimeout(() => adjustHeight(), 10);
+        },
+        getCurrentText: () => userInput,
+        onCancelAudio
+    });
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -621,6 +529,7 @@ const AssistantHomeScreen: React.FC<{
 
     const handleSubmit = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        if (isListening) stopListening();
         if (isQuotaLocked) {
             onRequireAuth?.();
             return;
@@ -765,7 +674,9 @@ const AssistantHomeScreen: React.FC<{
                     <form onSubmit={handleSubmit} className="relative">
                         <div className={cn(
                             "relative bg-black/80 backdrop-blur-2xl rounded-2xl border transition-all shadow-2xl p-2",
-                            isQuotaLocked
+                            isListening
+                                ? "border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.25)]"
+                                : isQuotaLocked
                                 ? "border-neutral-800 bg-neutral-950/60"
                                 : "border-neutral-800 focus-within:border-neutral-600 focus-within:ring-1 focus-within:ring-neutral-700/50"
                         )}>
@@ -798,14 +709,14 @@ const AssistantHomeScreen: React.FC<{
                                         handleSubmit();
                                     }
                                 }}
-                                disabled={isRecording || isQuotaLocked}
+                                disabled={isQuotaLocked}
                                 placeholder={
                                     isQuotaLocked
                                         ? isKn ? "ಉಚಿತ ಡೆಮೊ ಮಿತಿ ತಲುಪಿದೆ. ಮುಂದುವರಿಯಲು ಸೈನ್ ಇನ್ ಮಾಡಿ." : "Free demo limit reached. Sign In to continue."
                                         : isTranscribing
-                                        ? "Recognizing speech with Sarvam AI..."
-                                        : isRecording
-                                        ? "Listening... Click mic again to finish"
+                                        ? (isKn ? "ಧ್ವನಿ ಪರಿವರ್ತಿಸಲಾಗುತ್ತಿದೆ..." : "Transcribing speech...")
+                                        : isListening
+                                        ? (isKn ? "🎙️ ಧ್ವನಿ ರೆಕಾರ್ಡ್ ಆಗುತ್ತಿದೆ... ಮಾತನಾಡಿ (ನಿಲ್ಲಿಸಲು ಮೈಕ್ ಕ್ಲಿಕ್ ಮಾಡಿ)" : "🎙️ Listening... Speak now (click mic to stop)")
                                         : isKn ? "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಿ ಅಥವಾ ಮಾತನಾಡಿ..." : "Ask your crop question, paste image, or click mic..."
                                 }
                                 className={cn(
@@ -835,7 +746,7 @@ const AssistantHomeScreen: React.FC<{
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => fileInputRef.current?.click()}
-                                        disabled={isRecording || isQuotaLocked}
+                                        disabled={isQuotaLocked}
                                         className="text-neutral-400 hover:text-white hover:bg-neutral-800/80 rounded-xl"
                                         title={texts.attachFile}
                                     >
@@ -847,17 +758,17 @@ const AssistantHomeScreen: React.FC<{
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        onClick={onToggleRecording}
+                                        onClick={toggleListening}
                                         disabled={isQuotaLocked}
                                         className={cn(
                                             "rounded-xl transition-all",
-                                            isRecording
-                                                ? "bg-red-600 text-white animate-pulse shadow-lg"
+                                            isListening
+                                                ? "bg-red-600 hover:bg-red-700 text-white animate-pulse shadow-lg shadow-red-500/40"
                                                 : isTranscribing
                                                 ? "bg-neutral-700 text-white animate-spin"
                                                 : "text-neutral-400 hover:text-white hover:bg-neutral-800/80"
                                         )}
-                                        title={isRecording ? "Stop Recording" : "Voice Input"}
+                                        title={isListening ? (isKn ? "ರೆಕಾರ್ಡಿಂಗ್ ನಿಲ್ಲಿಸಿ" : "Stop Listening") : (isKn ? "ಧ್ವನಿ ಮೂಲಕ ಟೈಪ್ ಮಾಡಿ" : "Speak to Type")}
                                     >
                                         <Mic className="w-5 h-5" />
                                     </Button>
@@ -930,23 +841,18 @@ const ChatScreen: React.FC<{
     onSendMessage: (p: string, a: File | null) => void;
     isVoiceEnabled: boolean;
     setIsVoiceEnabled: (enabled: boolean) => void;
-    isRecording: boolean;
-    isTranscribing: boolean;
-    onToggleRecording: () => void;
     isSpeaking: boolean;
     onCancelSpeak: () => void;
     setCurrentLanguage: (lang: Language) => void;
     onGoHome: () => void;
-    speechError: string | null;
     isDemoMode?: boolean;
     demoCount: number;
     onRequireAuth?: () => void;
     onClose?: () => void;
 }> = ({
     texts, currentLanguage, history, isLoading, onSendMessage,
-    isVoiceEnabled, setIsVoiceEnabled, isRecording, isTranscribing,
-    onToggleRecording, isSpeaking, onCancelSpeak, setCurrentLanguage,
-    onGoHome, speechError, isDemoMode, demoCount, onRequireAuth, onClose
+    isVoiceEnabled, setIsVoiceEnabled, isSpeaking, onCancelSpeak, setCurrentLanguage,
+    onGoHome, isDemoMode, demoCount, onRequireAuth, onClose
 }) => {
     const [userInput, setUserInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
@@ -963,6 +869,22 @@ const ChatScreen: React.FC<{
     const isKn = currentLanguage === Language.KN;
     const remainingPrompts = Math.max(0, DEMO_PROMPT_LIMIT - demoCount);
     const isQuotaLocked = isDemoMode && remainingPrompts === 0;
+
+    const {
+        isListening,
+        isTranscribing,
+        speechError,
+        toggleListening,
+        stopListening
+    } = useSpeechDictation({
+        lang: currentLanguage,
+        onTextChange: (newText) => {
+            setUserInput(newText);
+            setTimeout(() => adjustHeight(), 10);
+        },
+        getCurrentText: () => userInput,
+        onCancelAudio: onCancelSpeak
+    });
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -989,6 +911,7 @@ const ChatScreen: React.FC<{
 
     const handleSubmit = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        if (isListening) stopListening();
         if (isQuotaLocked) {
             onRequireAuth?.();
             return;
@@ -1236,14 +1159,14 @@ const ChatScreen: React.FC<{
                                     handleSubmit();
                                 }
                             }}
-                            disabled={isRecording || isQuotaLocked}
+                            disabled={isQuotaLocked}
                             placeholder={
                                 isQuotaLocked
                                     ? isKn ? "ಉಚಿತ ಡೆಮೊ ಮಿತಿ ತಲುಪಿದೆ. ಮುಂದುವರಿಯಲು ಸೈನ್ ಇನ್ ಮಾಡಿ." : "Free demo limit reached. Sign In to continue."
                                     : isTranscribing
-                                    ? "Recognizing speech with Sarvam AI..."
-                                    : isRecording
-                                    ? "Listening... Click mic again to finish"
+                                    ? (isKn ? "ಧ್ವನಿ ಪರಿವರ್ತಿಸಲಾಗುತ್ತಿದೆ..." : "Transcribing speech...")
+                                    : isListening
+                                    ? (isKn ? "🎙️ ಧ್ವನಿ ರೆಕಾರ್ಡ್ ಆಗುತ್ತಿದೆ... ಮಾತನಾಡಿ (ನಿಲ್ಲಿಸಲು ಮೈಕ್ ಕ್ಲಿಕ್ ಮಾಡಿ)" : "🎙️ Listening... Speak now (click mic to stop)")
                                     : isKn ? "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಿ..." : "Ask your crop question or click mic..."
                             }
                             className={cn(
@@ -1272,7 +1195,7 @@ const ChatScreen: React.FC<{
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => fileInputRef.current?.click()}
-                                    disabled={isRecording || isQuotaLocked}
+                                    disabled={isQuotaLocked}
                                     className="text-neutral-400 hover:text-white hover:bg-neutral-800/80 rounded-xl"
                                     title={texts.attachFile}
                                 >
@@ -1283,17 +1206,17 @@ const ChatScreen: React.FC<{
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    onClick={onToggleRecording}
+                                    onClick={toggleListening}
                                     disabled={isQuotaLocked}
                                     className={cn(
                                         "rounded-xl transition-all",
-                                        isRecording
-                                            ? "bg-red-600 text-white animate-pulse shadow-lg"
+                                        isListening
+                                            ? "bg-red-600 hover:bg-red-700 text-white animate-pulse shadow-lg shadow-red-500/40"
                                             : isTranscribing
                                             ? "bg-neutral-700 text-white animate-spin"
                                             : "text-neutral-400 hover:text-white hover:bg-neutral-800/80"
                                     )}
-                                    title={isRecording ? "Stop Recording" : "Voice Input"}
+                                    title={isListening ? (isKn ? "ರೆಕಾರ್ಡಿಂಗ್ ನಿಲ್ಲಿಸಿ" : "Stop Listening") : (isKn ? "ಧ್ವನಿ ಮೂಲಕ ಟೈಪ್ ಮಾಡಿ" : "Speak to Type")}
                                 >
                                     <Mic className="w-5 h-5" />
                                 </Button>
@@ -1354,11 +1277,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     const [history, setHistory] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
-    const [isRecording, setIsRecording] = useState(false);
-    const [isTranscribing, setIsTranscribing] = useState(false);
-    const [liveTranscript, setLiveTranscript] = useState<string>('');
     const [isSpeaking, setIsSpeaking] = useState(false);
-    const [speechError, setSpeechError] = useState<string | null>(null);
     const [demoCount, setDemoCount] = useState<number>(() => isDemoMode ? getStoredDemoCount() : 0);
     const [showAuthGate, setShowAuthGate] = useState<boolean>(false);
     const isSendingRef = useRef(false);
@@ -1691,36 +1610,6 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         }
     }, [currentLanguage, history, isVoiceEnabled, queueSpeech, texts, isLoading, isDemoMode, demoCount, user]);
 
-    const handleVoiceResult = useCallback((transcript: string) => {
-        if (transcript && transcript.trim()) {
-            handleSendMessage(transcript.trim(), null);
-        }
-    }, [handleSendMessage]);
-
-    const handleSpeechError = useCallback((error: string) => {
-        let message = texts.errorSpeechGeneric;
-        if (error === 'network') message = texts.errorSpeechNetwork;
-        else if (error) message = error;
-        setSpeechError(message);
-        setTimeout(() => setSpeechError(null), 4000);
-    }, [texts]);
-
-    const { stopRecording, toggleRecording } = useVoiceSpeechRecognition(
-        handleVoiceResult,
-        setIsRecording,
-        setIsTranscribing,
-        handleSpeechError,
-        setLiveTranscript,
-        currentLanguage
-    );
-
-    const handleMicToggle = useCallback(() => {
-        handleCancelSpeak();
-        setSpeechError(null);
-        setLiveTranscript('');
-        toggleRecording(isRecording);
-    }, [handleCancelSpeak, toggleRecording, isRecording]);
-
     const goHome = () => {
         handleCancelSpeak();
         setHistory([]);
@@ -1738,10 +1627,6 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                             texts={texts}
                             currentLanguage={currentLanguage}
                             onStartConversation={handleSendMessage}
-                            isRecording={isRecording}
-                            isTranscribing={isTranscribing}
-                            onToggleRecording={handleMicToggle}
-                            speechError={speechError}
                             isDemoMode={isDemoMode}
                             demoCount={demoCount}
                             onRequireAuth={() => {
@@ -1750,6 +1635,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                             }}
                             onClose={onClose}
                             setCurrentLanguage={setCurrentLanguage}
+                            onCancelAudio={handleCancelSpeak}
                         />
                     </motion.div>
                 ) : (
@@ -1762,14 +1648,10 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                             onSendMessage={handleSendMessage}
                             isVoiceEnabled={isVoiceEnabled}
                             setIsVoiceEnabled={setIsVoiceEnabled}
-                            isRecording={isRecording}
-                            isTranscribing={isTranscribing}
-                            onToggleRecording={handleMicToggle}
                             isSpeaking={isSpeaking}
                             onCancelSpeak={handleCancelSpeak}
                             setCurrentLanguage={setCurrentLanguage}
                             onGoHome={goHome}
-                            speechError={speechError}
                             isDemoMode={isDemoMode}
                             demoCount={demoCount}
                             onRequireAuth={() => {
@@ -1779,18 +1661,6 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                             onClose={onClose}
                         />
                     </motion.div>
-                )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-                {isRecording && (
-                    <ListeningView
-                        texts={texts}
-                        speechError={speechError}
-                        isTranscribing={isTranscribing}
-                        liveTranscript={liveTranscript}
-                        onStop={stopRecording}
-                    />
                 )}
             </AnimatePresence>
 
