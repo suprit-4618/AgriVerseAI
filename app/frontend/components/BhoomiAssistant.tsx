@@ -1564,14 +1564,18 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                 const imageBase64 = await fileToBase64(attachment);
                 const analysisResult = await getPlantDiseaseAnalysis(
                     imageBase64,
-                    attachment.type,
-                    currentLanguage,
-                    prompt
+                    attachment.type
                 );
 
-                const botResponseText = analysisResult.disease
-                    ? `### ${analysisResult.disease}\n\n**${texts.diagnosisConfidence}:** ${analysisResult.confidence}\n\n**${texts.organicRemedy}:**\n${analysisResult.treatment.organic}\n\n**${texts.chemicalRemedy}:**\n${analysisResult.treatment.chemical}\n\n**${texts.preventiveMeasures}:**\n${analysisResult.treatment.prevention}`
-                    : analysisResult.rawAnalysis || texts.noDiseaseFound;
+                const isKn = currentLanguage === Language.KN;
+                const diseaseName = analysisResult.diseaseName?.[currentLanguage] || analysisResult.diseaseName?.en || (isKn ? 'ಆರೋಗ್ಯಕರ ಸಸ್ಯ' : 'Healthy Plant');
+                const confidencePct = Math.round((analysisResult.confidenceScore || 0) * 100);
+                const medicine = analysisResult.treatment?.medicineName?.[currentLanguage] || analysisResult.treatment?.medicineName?.en || (isKn ? 'ಯಾವುದೇ ಔಷಧಿ ಅಗತ್ಯವಿಲ್ಲ' : 'No medicine needed');
+                const preventionList = (analysisResult.prevention?.[currentLanguage] || analysisResult.prevention?.en || []).join('\n• ');
+
+                const botResponseText = analysisResult.isDiseaseFound
+                    ? `### ${diseaseName}\n\n**${texts.diagnosisConfidence}:** ${confidencePct}%\n\n**${texts.organicRemedy}:**\n${medicine}\n\n**${texts.preventiveMeasures}:**\n• ${preventionList}`
+                    : texts.noDiseaseFound;
 
                 setHistory(prev => {
                     const next = [...prev];
@@ -1596,7 +1600,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
 
                 let streamSuccess = false;
                 try {
-                    const stream = await getBhoomiResponseStream(currentHistory, prompt, currentLanguage, user);
+                    const stream = await getBhoomiResponseStream(currentHistory, currentLanguage, user);
                     for await (const chunk of stream) {
                         if (newSessionId !== currentSessionIdRef.current) break;
                         const chunkText = chunk.text || '';
@@ -1632,7 +1636,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                 }
 
                 if (!streamSuccess) {
-                    const groqStream = await getGroqBhoomiStream(currentHistory, prompt, currentLanguage, user);
+                    const groqStream = await getGroqBhoomiStream(currentHistory, currentLanguage, user);
                     for await (const chunk of groqStream) {
                         if (newSessionId !== currentSessionIdRef.current) break;
                         const chunkText = chunk.text || '';

@@ -145,25 +145,39 @@ import { Language } from '../types';
  * Streams chat responses from Groq LLaMA-3.3 70B with ultra-low latency (<200ms)
  */
 export const getGroqBhoomiStream = async function* (
-  history: { role: 'user' | 'model'; text: string }[],
-  currentLanguage: Language
+  history: (any)[],
+  currentLanguage: Language,
+  user?: any
 ) {
   const apiKey = getGroqKey();
   if (!apiKey) throw new Error("GROQ_API_KEY_MISSING");
 
   const trimmedHistory = history.slice(-10);
+  const isKn = currentLanguage === Language.KN;
+  const langRule = isKn
+    ? "\n\nCRITICAL INSTRUCTION: The user is communicating in KANNADA (ಕನ್ನಡ). You MUST formulate your entire response in authentic, fluent Kannada script (ಕನ್ನಡ ಲಿಪಿ). Do NOT reply in English."
+    : "\n\nCRITICAL INSTRUCTION: The user is communicating in ENGLISH. Formulate your entire response in English.";
+
   const messages: { role: string; content: string }[] = [
-    { role: 'system', content: BHOOMI_SYSTEM_PROMPT },
-    ...trimmedHistory.map(msg => ({
-      role: msg.role === 'model' ? 'assistant' : 'user',
-      content: msg.text || ''
-    }))
+    { role: 'system', content: BHOOMI_SYSTEM_PROMPT + langRule },
+    ...trimmedHistory.map(msg => {
+      let msgText = '';
+      if (Array.isArray((msg as any).parts) && (msg as any).parts.length > 0) {
+        msgText = (msg as any).parts.map((p: any) => p.text).join('\n');
+      } else if ((msg as any).text) {
+        msgText = (msg as any).text;
+      }
+      return {
+        role: msg.role === 'model' ? 'assistant' : 'user',
+        content: msgText
+      };
+    })
   ];
 
   const lastMsg = messages[messages.length - 1];
   if (lastMsg && lastMsg.role === 'user') {
-    const langPrompt = currentLanguage === Language.KN
-      ? "\n\n(System: Please reply to this message strictly in Kannada)"
+    const langPrompt = isKn
+      ? "\n\n(System: Please reply to this message strictly in Kannada / ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲಿ ಉತ್ತರಿಸಿ)"
       : "\n\n(System: Please reply to this message strictly in English)";
     lastMsg.content += langPrompt;
   }

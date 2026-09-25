@@ -16,8 +16,9 @@ const ai = new GoogleGenAI({
 });
 
 export const getBhoomiResponseStream = async (
-  history: { role: 'user' | 'model'; text: string }[],
-  currentLanguage: Language
+  history: (ChatMessage | { role: 'user' | 'model'; text?: string; parts?: { text: string }[] })[],
+  currentLanguage: Language,
+  user?: UserProfile
 ) => {
   if (!getGeminiKey()) {
     throw new Error("API_KEY_MISSING");
@@ -27,16 +28,31 @@ export const getBhoomiResponseStream = async (
   const trimmedHistory = history.slice(-10);
 
   // 2. Format history for Google GenAI SDK
-  const contents = trimmedHistory.map(msg => ({
-    role: msg.role === 'model' ? 'model' : 'user',
-    parts: [{ text: msg.text || '' }]
-  }));
+  const contents = trimmedHistory.map(msg => {
+    let msgText = '';
+    if (Array.isArray((msg as any).parts) && (msg as any).parts.length > 0) {
+      msgText = (msg as any).parts.map((p: any) => p.text).join('\n');
+    } else if ((msg as any).text) {
+      msgText = (msg as any).text;
+    }
+    return {
+      role: msg.role === 'model' ? 'model' : 'user',
+      parts: [{ text: msgText }]
+    };
+  });
+
+  const isKn = currentLanguage === Language.KN;
+  const langRule = isKn 
+    ? "\n\nCRITICAL INSTRUCTION: The user is communicating in KANNADA (ಕನ್ನಡ). You MUST formulate your entire response in authentic, fluent Kannada script (ಕನ್ನಡ ಲಿಪಿ). Do NOT reply in English."
+    : "\n\nCRITICAL INSTRUCTION: The user is communicating in ENGLISH. Formulate your entire response in English.";
+
+  const dynamicSystemPrompt = BHOOMI_SYSTEM_PROMPT + langRule;
 
   // 3. Inject Golden Language Rule Tag to last user message
   const lastMsg = contents[contents.length - 1];
   if (lastMsg && lastMsg.role === 'user') {
-    const langPrompt = currentLanguage === Language.KN 
-        ? "\n\n(System: Please reply to this message strictly in Kannada)" 
+    const langPrompt = isKn 
+        ? "\n\n(System: Please reply to this message strictly in Kannada / ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲಿ ಉತ್ತರಿಸಿ)" 
         : "\n\n(System: Please reply to this message strictly in English)";
     lastMsg.parts[0].text += langPrompt;
   }
@@ -46,7 +62,7 @@ export const getBhoomiResponseStream = async (
     model: 'gemini-2.5-flash',
     contents,
     config: {
-      systemInstruction: { parts: [{ text: BHOOMI_SYSTEM_PROMPT }] },
+      systemInstruction: { parts: [{ text: dynamicSystemPrompt }] },
       temperature: 0.7,
     }
   });
