@@ -15,6 +15,7 @@ import {
     Sprout, TrendingUp, FlaskConical, CloudRain, Bug, Building2, X, Check,
     Copy, RotateCcw, Info, ShieldCheck, ArrowRight, UserCircle2, CornerDownLeft
 } from 'lucide-react';
+import LanguageToggle from './common/LanguageToggle';
 import ListeningAnimation from './common/ListeningAnimation';
 import GeneratingAnimation from './common/GeneratingAnimation';
 import MarkdownRenderer from './common/MarkdownRenderer';
@@ -399,7 +400,7 @@ const setStoredDemoCount = (count: number) => {
     } catch {}
 };
 
-// Demo Limit / Auth Prompt Modal
+// Demo Limit / Auth Prompt Modal (Monochrome Dark Theme)
 const AuthGateModal: React.FC<{
     currentLanguage: Language;
     onSignIn: () => void;
@@ -409,7 +410,7 @@ const AuthGateModal: React.FC<{
 
     return (
         <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -420,17 +421,14 @@ const AuthGateModal: React.FC<{
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, y: 20 }}
             >
-                <div className="absolute -top-12 -right-12 w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-blue-500/20 rounded-full blur-2xl pointer-events-none" />
-                <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gradient-to-tr from-purple-500/20 to-pink-500/20 rounded-full blur-2xl pointer-events-none" />
-
-                <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-500 to-blue-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                    <Sparkles className="w-8 h-8 text-white" />
+                <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-neutral-900 border border-neutral-700 flex items-center justify-center shadow-lg">
+                    <Sparkles className="w-7 h-7 text-white" />
                 </div>
 
-                <h3 className="text-2xl font-bold tracking-tight mb-2">
-                    {isKn ? "ಉಚಿತ ಡೆಮೊ ಮಿತಿ ತಲುಪಿದೆ!" : "Free Demo Limit Reached!"}
+                <h3 className="text-2xl font-bold tracking-tight mb-2 text-white">
+                    {isKn ? "ಉಚಿತ ಡೆಮೊ ಮಿತಿ ತಲುಪಿದೆ" : "Free Demo Limit Reached"}
                 </h3>
-                <p className="text-sm text-neutral-300 leading-relaxed mb-6">
+                <p className="text-sm text-neutral-400 leading-relaxed mb-6 font-normal">
                     {isKn
                         ? "ನೀವು ಭೂಮಿ AI ಯ 3 ಉಚಿತ ಪ್ರಶ್ನೆಗಳನ್ನು ಪೂರ್ಣಗೊಳಿಸಿದ್ದೀರಿ. ಅನಿಯಮಿತ ಧ್ವನಿ ಸಂಭಾಷಣೆಗಳು, ಬೆಳೆ ರೋಗ ರಕ್ಷಣೆ ಮತ್ತು ಮಂಡಿ ದರಗಳನ್ನು ಪಡೆಯಲು ಖಾತೆಗೆ ಲಾಗ್ ಇನ್ ಅಥವಾ ಸೈನ್ ಅಪ್ ಮಾಡಿ."
                         : "You've used all 3 free trial questions with Bhoomi AI. Create a free account or sign in to unlock unlimited voice consultations, crop health tracking, and live mandi rates."}
@@ -439,10 +437,10 @@ const AuthGateModal: React.FC<{
                 <div className="flex flex-col gap-3">
                     <button
                         onClick={onSignIn}
-                        className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-base shadow-lg shadow-emerald-500/30 transform hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        className="w-full py-3.5 px-6 rounded-xl bg-white hover:bg-neutral-200 text-black font-semibold text-base shadow-lg transform hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
                     >
                         <span>{isKn ? "ಸೈನ್ ಇನ್ / ನೋಂದಾಯಿಸಿ" : "Sign In / Register to Continue"}</span>
-                        <ArrowRight className="w-5 h-5" />
+                        <ArrowRight className="w-5 h-5 text-black" />
                     </button>
 
                     {onClose && (
@@ -468,7 +466,7 @@ interface BhoomiAssistantProps {
     onClose?: () => void;
 }
 
-// Listening View (Celestial Glass Fullscreen Modal)
+// Listening View (Celestial Monochrome Glass Fullscreen Modal)
 const ListeningView: React.FC<{
     texts: UIStringContent;
     speechError: string | null;
@@ -479,7 +477,7 @@ const ListeningView: React.FC<{
     return (
         <motion.div
             key="listening-view"
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-3xl backdrop-blur-2xl bg-black/85 cursor-pointer select-none px-4"
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-3xl backdrop-blur-2xl bg-black/90 cursor-pointer select-none px-4"
             onClick={onStop}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -498,9 +496,9 @@ const ListeningView: React.FC<{
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-lg w-full mx-4 mb-6 px-6 py-4 rounded-2xl bg-neutral-900/90 border border-emerald-500/40 shadow-2xl backdrop-blur-md text-center"
+                    className="max-w-lg w-full mx-4 mb-6 px-6 py-4 rounded-2xl bg-neutral-900 border border-neutral-700 shadow-2xl backdrop-blur-md text-center"
                 >
-                    <p className="text-xs font-mono text-emerald-400 mb-1 uppercase tracking-wider">🎙️ Spoken Words:</p>
+                    <p className="text-xs font-mono text-neutral-400 mb-1 uppercase tracking-wider">🎙️ Spoken Words:</p>
                     <p className="text-lg font-medium text-white italic">"{liveTranscript}"</p>
                 </motion.div>
             ) : (
@@ -518,18 +516,18 @@ const ListeningView: React.FC<{
                         e.stopPropagation();
                         onStop?.();
                     }}
-                    className="w-20 h-20 bg-gradient-to-r from-red-500 via-pink-600 to-purple-600 rounded-full flex items-center justify-center shadow-2xl shadow-red-500/50 animate-pulse hover:scale-105 active:scale-95 transition-transform"
+                    className="w-20 h-20 bg-white hover:bg-neutral-200 text-black rounded-full flex items-center justify-center shadow-2xl animate-pulse hover:scale-105 active:scale-95 transition-transform"
                     aria-label="Stop recording"
                 >
-                    <Mic className="w-10 h-10 text-white" />
+                    <Mic className="w-10 h-10 text-black" />
                 </button>
-                <span className="text-xs sm:text-sm text-neutral-300 font-medium bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-sm border border-neutral-800">
+                <span className="text-xs sm:text-sm text-neutral-300 font-medium bg-black/70 px-4 py-1.5 rounded-full backdrop-blur-sm border border-neutral-800">
                     Click anywhere or mic when finished speaking
                 </span>
             </motion.div>
 
             {speechError && (
-                <div className="absolute top-8 mx-4 text-sm text-red-200 bg-red-900/80 border border-red-500/50 px-6 py-3 rounded-xl backdrop-blur-md shadow-2xl">
+                <div className="absolute top-8 mx-4 text-sm text-red-200 bg-neutral-900 border border-red-500/50 px-6 py-3 rounded-xl backdrop-blur-md shadow-2xl">
                     {speechError}
                 </div>
             )}
@@ -537,7 +535,7 @@ const ListeningView: React.FC<{
     );
 };
 
-// Redesigned Celestial Quick Action Pill Component
+// Redesigned Monochrome Quick Action Pill Component
 interface QuickActionPillProps {
     icon: React.ReactNode;
     label: string;
@@ -552,15 +550,15 @@ const QuickActionPill: React.FC<QuickActionPillProps> = ({ icon, label, onClick,
             variant="outline"
             onClick={onClick}
             disabled={disabled}
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-full border-neutral-800/80 bg-neutral-900/70 hover:bg-neutral-800/90 text-neutral-200 hover:text-white shadow-lg backdrop-blur-md transition-all transform hover:scale-[1.03] active:scale-[0.98] disabled:opacity-40"
+            className="flex items-center gap-2.5 px-4 py-2.5 rounded-full border-neutral-800 bg-neutral-900/80 hover:bg-neutral-800 text-neutral-300 hover:text-white shadow-lg backdrop-blur-md transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40"
         >
-            <span className="text-emerald-400">{icon}</span>
+            <span className="text-neutral-400">{icon}</span>
             <span className="text-xs sm:text-sm font-medium">{label}</span>
         </Button>
     );
 };
 
-// Assistant Home Screen (Ruixen-Inspired Modern Celestial Design)
+// Assistant Home Screen (Clean Monochrome Celestial Design)
 const AssistantHomeScreen: React.FC<{
     user?: UserProfile;
     texts: UIStringContent;
@@ -646,32 +644,32 @@ const AssistantHomeScreen: React.FC<{
 
     const quickActions = [
         {
-            icon: <Sprout className="w-4 h-4 text-emerald-400" />,
+            icon: <Sprout className="w-4 h-4 text-white" />,
             label: isKn ? "ಬೆಳೆ ರೋಗ ಪರೀಕ್ಷೆ" : "Crop Disease Diagnosis",
             prompt: isKn ? "ನನ್ನ ಬೆಳೆಯಲ್ಲಿ ಎಲೆಗಳು ಹಳದಿಯಾಗುತ್ತಿವೆ ಮತ್ತು ಕಲೆಗಳು ಕಾಣಿಸುತ್ತಿವೆ. ಇದಕ್ಕೆ ಪರಿಹಾರ ಮತ್ತು ಔಷಧಿ ತಿಳಿಸಿ." : "How to diagnose and cure leaf yellowing and fungal spots on crops?"
         },
         {
-            icon: <TrendingUp className="w-4 h-4 text-amber-400" />,
+            icon: <TrendingUp className="w-4 h-4 text-white" />,
             label: isKn ? "ಇಂದಿನ ಮಂಡಿ ದರಗಳು" : "Live Mandi Prices",
             prompt: isKn ? "ಕರ್ನಾಟಕದ ಇಂದಿನ ಪ್ರಮುಖ ಮಾರುಕಟ್ಟೆಗಳಲ್ಲಿ ಟೊಮೆಟೊ, ಈರುಳ್ಳಿ ಮತ್ತು ಭತ್ತದ ದರಗಳೇನು?" : "What are today's market mandi prices for Tomato, Onion, and Paddy in Karnataka?"
         },
         {
-            icon: <FlaskConical className="w-4 h-4 text-cyan-400" />,
+            icon: <FlaskConical className="w-4 h-4 text-white" />,
             label: isKn ? "ಮಣ್ಣಿನ ಪೋಷಕಾಂಶ ಸಲಹೆ" : "Soil Health & NPK",
             prompt: isKn ? "ಹೆಚ್ಚಿನ ಇಳುವರಿಗಾಗಿ ಜಮೀನಿನಲ್ಲಿ NPK ಗೊಬ್ಬರದ ಸಮತೋಲನ ಪ್ರಮಾಣ ಮತ್ತು ಮಣ್ಣಿನ ಫಲವತ್ತತೆ ಸಲಹೆ ನೀಡಿ." : "What is the recommended NPK fertilizer schedule and soil fertility improvement tips?"
         },
         {
-            icon: <CloudRain className="w-4 h-4 text-blue-400" />,
+            icon: <CloudRain className="w-4 h-4 text-white" />,
             label: isKn ? "ಹವಾಮಾನ & ನೀರಾವರಿ" : "Weather & Irrigation",
             prompt: isKn ? "ಮುಂಬರುವ ದಿನಗಳ ಹವಾಮಾನ ಮುನ್ಸೂಚನೆ ಆಧರಿಸಿ ಕೃಷಿ ನೀರಾವರಿ ಹೇಗೆ ನಿರ್ವಹಿಸಬೇಕು?" : "How should I plan drip irrigation based on upcoming weather and rainfall forecasts?"
         },
         {
-            icon: <Bug className="w-4 h-4 text-rose-400" />,
+            icon: <Bug className="w-4 h-4 text-white" />,
             label: isKn ? "ಸಾವಯವ ಕೀಟನಾಶಕ" : "Organic Pest Control",
             prompt: isKn ? "ರಾಸಾಯನಿಕ ಮುಕ್ತ ಸಾವಯವ ಕೀಟನಾಶಕ ಮತ್ತು ನೀಮ್ ಕಷಾಯ ತಯಾರಿಸುವ ವಿಧಾನ ತಿಳಿಸಿ." : "How to prepare effective organic neem-based pest control remedies at home?"
         },
         {
-            icon: <Building2 className="w-4 h-4 text-purple-400" />,
+            icon: <Building2 className="w-4 h-4 text-white" />,
             label: isKn ? "ಸರ್ಕಾರಿ ಸೌಲಭ್ಯಗಳು" : "Govt Subsidies (Kisan)",
             prompt: isKn ? "ರೈತರಿಗಾಗಿ ಲಭ್ಯವಿರುವ ಪ್ರಮುಖ ಕೃಷಿ ಯೋಜನೆಗಳು, ಸಬ್ಸಿಡಿಗಳು ಮತ್ತು ಪಿಎಂ ಕಿಸಾನ್ ಪ್ರಯೋಜನಗಳ ಮಾಹಿತಿ ನೀಡಿ." : "What government schemes, subsidies, and PM-Kisan financial aids are available for farmers?"
         }
@@ -679,24 +677,18 @@ const AssistantHomeScreen: React.FC<{
 
     return (
         <div 
-            className="relative w-full h-full min-h-screen bg-cover bg-center flex flex-col justify-between p-4 sm:p-6 overflow-y-auto galaxy-scrollbar"
+            className="relative w-full h-full min-h-screen bg-cover bg-center flex flex-col justify-between p-4 sm:p-6 overflow-y-auto galaxy-scrollbar bg-black"
             style={{
-                backgroundImage: "url('https://cdn.21st.dev/assets/mirror/c3/c333918af688a4a8a3d004652e6c0ee219457a9d84d380eeb31f513d4b59a09f.png')",
+                backgroundImage: "url('/bhoomi_planet_bg.jpg')",
                 backgroundAttachment: "fixed"
             }}
         >
-            <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px] pointer-events-none" />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-none" />
 
             {/* Top Navigation Bar */}
             <header className="relative z-10 w-full max-w-5xl mx-auto flex items-center justify-between py-2">
                 <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
-                        <Sparkles className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <span className="font-bold text-white text-base tracking-wide">Bhoomi AI</span>
-                        <span className="text-xs text-neutral-400 block font-mono">AgriVerse Intelligence</span>
-                    </div>
+                    <span className="font-semibold text-white text-lg tracking-tight">Bhoomi AI</span>
                 </div>
 
                 <div className="flex items-center gap-2.5">
@@ -704,22 +696,19 @@ const AssistantHomeScreen: React.FC<{
                         <div className={cn(
                             "px-3 py-1 rounded-full text-xs font-mono font-medium border backdrop-blur-md",
                             isQuotaLocked
-                                ? "bg-red-500/20 border-red-500/40 text-red-300"
-                                : "bg-emerald-500/20 border-emerald-500/30 text-emerald-300"
+                                ? "bg-neutral-900 border-neutral-800 text-neutral-400"
+                                : "bg-neutral-900 border-neutral-800 text-neutral-300"
                         )}>
-                            {isQuotaLocked ? "🔒 Limit Reached" : `⚡ Demo: ${remainingPrompts}/3 prompts`}
+                            {isQuotaLocked ? "Limit Reached" : `Demo: ${remainingPrompts}/3 prompts`}
                         </div>
                     )}
 
-                    {/* Language Switcher */}
-                    <Button
-                        variant="outline"
+                    {/* Standard Language Toggle */}
+                    <LanguageToggle
+                        currentLanguage={currentLanguage}
+                        setCurrentLanguage={setCurrentLanguage}
                         size="sm"
-                        onClick={() => setCurrentLanguage(isKn ? Language.EN : Language.KN)}
-                        className="rounded-full border-neutral-700 bg-black/50 text-xs font-mono text-neutral-200 hover:text-white hover:bg-neutral-800"
-                    >
-                        {isKn ? "English" : "ಕನ್ನಡ"}
-                    </Button>
+                    />
 
                     {onClose && (
                         <Button
@@ -737,31 +726,20 @@ const AssistantHomeScreen: React.FC<{
 
             {/* Center Content Section */}
             <main className="relative z-10 w-full max-w-3xl mx-auto flex-1 flex flex-col items-center justify-center my-6 text-center">
-                {/* Glowing Badge */}
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-4 shadow-lg backdrop-blur-md"
-                >
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span>{isKn ? "ಕೃಷಿ AI ಸಹಾಯಕ" : "Next-Gen Farm Intelligence"}</span>
-                </motion.div>
-
                 {/* Hero Title */}
                 <motion.h1
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
                     className="text-4xl sm:text-5xl font-bold tracking-tight text-white drop-shadow-md"
                 >
-                    {isKn ? "ಭೂಮಿ AI ಗೆ ಸುಸ್ವಾಗತ" : "Ask Bhoomi AI"}
+                    {isKn ? "ಭೂಮಿ AI" : "Ask Bhoomi AI"}
                 </motion.h1>
 
                 <motion.p
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                    className="mt-2.5 text-sm sm:text-base text-neutral-300 max-w-xl font-light leading-relaxed"
+                    transition={{ delay: 0.1 }}
+                    className="mt-2 text-sm sm:text-base text-neutral-400 max-w-xl font-normal leading-relaxed"
                 >
                     {isKn 
                         ? "ಬೆಳೆ ರೋಗ ಪರೀಕ್ಷೆ, ಮಾರುಕಟ್ಟೆ ದರಗಳು ಮತ್ತು ಕೃಷಿ ಸಲಹೆಗಳನ್ನು ಕನ್ನಡದಲ್ಲೇ ಧ್ವನಿ ಅಥವಾ ಪಠ್ಯದ ಮೂಲಕ ಪಡೆಯಿರಿ."
@@ -775,9 +753,9 @@ const AssistantHomeScreen: React.FC<{
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0 }}
-                        className="mt-4 px-4 py-2 rounded-2xl bg-neutral-900/60 border border-neutral-800/80 text-xs text-neutral-300 max-w-lg flex items-center gap-2 backdrop-blur-md shadow-inner"
+                        className="mt-4 px-4 py-2 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-xs text-neutral-300 max-w-lg flex items-center gap-2 backdrop-blur-md shadow-inner"
                     >
-                        <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                        <Sparkles className="w-4 h-4 text-neutral-300 shrink-0" />
                         <span className="truncate">{texts.agriculturalFacts[factIndex]}</span>
                     </motion.div>
                 )}
@@ -786,21 +764,21 @@ const AssistantHomeScreen: React.FC<{
                 <div className="w-full mt-8">
                     <form onSubmit={handleSubmit} className="relative">
                         <div className={cn(
-                            "relative bg-black/75 backdrop-blur-2xl rounded-2xl border transition-all shadow-2xl p-2",
+                            "relative bg-black/80 backdrop-blur-2xl rounded-2xl border transition-all shadow-2xl p-2",
                             isQuotaLocked
-                                ? "border-red-500/40 bg-red-950/20"
-                                : "border-neutral-700/80 focus-within:border-emerald-500/60 focus-within:ring-1 focus-within:ring-emerald-500/30"
+                                ? "border-neutral-800 bg-neutral-950/60"
+                                : "border-neutral-800 focus-within:border-neutral-600 focus-within:ring-1 focus-within:ring-neutral-700/50"
                         )}>
                             {/* Attachment Thumbnail Preview if file attached */}
                             {attachment && (
-                                <div className="flex items-center gap-2 p-2 mb-1 bg-neutral-900/90 rounded-xl border border-neutral-800 w-fit">
+                                <div className="flex items-center gap-2 p-2 mb-1 bg-neutral-900 rounded-xl border border-neutral-800 w-fit">
                                     {attachmentPreview ? (
                                         <img src={attachmentPreview} alt="upload preview" className="w-10 h-10 object-cover rounded-lg border border-neutral-700" />
                                     ) : (
                                         <Paperclip className="w-5 h-5 text-neutral-400" />
                                     )}
                                     <span className="text-xs text-neutral-200 max-w-[150px] truncate">{attachment.name}</span>
-                                    <button type="button" onClick={handleRemoveAttachment} className="p-1 hover:text-red-400 text-neutral-400">
+                                    <button type="button" onClick={handleRemoveAttachment} className="p-1 hover:text-white text-neutral-400">
                                         <X className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -874,10 +852,10 @@ const AssistantHomeScreen: React.FC<{
                                         className={cn(
                                             "rounded-xl transition-all",
                                             isRecording
-                                                ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50"
+                                                ? "bg-red-600 text-white animate-pulse shadow-lg"
                                                 : isTranscribing
-                                                ? "bg-purple-600 text-white animate-spin"
-                                                : "text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800/80"
+                                                ? "bg-neutral-700 text-white animate-spin"
+                                                : "text-neutral-400 hover:text-white hover:bg-neutral-800/80"
                                         )}
                                         title={isRecording ? "Stop Recording" : "Voice Input"}
                                     >
@@ -890,7 +868,7 @@ const AssistantHomeScreen: React.FC<{
                                         <Button
                                             type="button"
                                             onClick={onRequireAuth}
-                                            className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-lg"
+                                            className="bg-white hover:bg-neutral-200 text-black text-xs font-semibold px-4 py-2 rounded-xl shadow-lg"
                                         >
                                             {isKn ? "ಸೈನ್ ಇನ್" : "Sign In"}
                                         </Button>
@@ -901,11 +879,11 @@ const AssistantHomeScreen: React.FC<{
                                             className={cn(
                                                 "px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-lg",
                                                 (userInput.trim() || attachment)
-                                                    ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/20"
-                                                    : "bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                                                    ? "bg-white hover:bg-neutral-200 text-black font-medium"
+                                                    : "bg-neutral-800 text-neutral-600 cursor-not-allowed"
                                             )}
                                         >
-                                            <ArrowUp className="w-4 h-4" />
+                                            <ArrowUp className="w-4 h-4 text-current" />
                                             <span className="text-xs font-medium hidden sm:inline">{isKn ? "ಕಳುಹಿಸಿ" : "Send"}</span>
                                         </Button>
                                     )}
@@ -915,7 +893,7 @@ const AssistantHomeScreen: React.FC<{
                     </form>
 
                     {speechError && (
-                        <p className="mt-2 text-xs text-red-400 text-center font-medium bg-red-950/40 py-1 px-3 rounded-full border border-red-500/20 inline-block">
+                        <p className="mt-2 text-xs text-red-300 text-center font-medium bg-neutral-900 py-1 px-3 rounded-full border border-red-500/30 inline-block">
                             {speechError}
                         </p>
                     )}
@@ -943,7 +921,7 @@ const AssistantHomeScreen: React.FC<{
     );
 };
 
-// Redesigned Chat Conversation Screen
+// Redesigned Chat Conversation Screen (Clean Monochrome Celestial Design)
 const ChatScreen: React.FC<{
     texts: UIStringContent;
     currentLanguage: Language;
@@ -1032,16 +1010,16 @@ const ChatScreen: React.FC<{
 
     return (
         <div 
-            className="relative w-full h-full flex flex-col justify-between bg-cover bg-center overflow-hidden"
+            className="relative w-full h-full flex flex-col justify-between bg-cover bg-center overflow-hidden bg-black"
             style={{
-                backgroundImage: "url('https://cdn.21st.dev/assets/mirror/c3/c333918af688a4a8a3d004652e6c0ee219457a9d84d380eeb31f513d4b59a09f.png')",
+                backgroundImage: "url('/bhoomi_planet_bg.jpg')",
                 backgroundAttachment: "fixed"
             }}
         >
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-[3px] pointer-events-none" />
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-[3px] pointer-events-none" />
 
             {/* Chat Floating Header */}
-            <header className="relative z-10 w-full px-4 py-3 border-b border-neutral-800/80 bg-black/60 backdrop-blur-xl flex items-center justify-between">
+            <header className="relative z-10 w-full px-4 py-3 border-b border-neutral-800 bg-black/60 backdrop-blur-xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Button
                         variant="ghost"
@@ -1053,20 +1031,7 @@ const ChatScreen: React.FC<{
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
 
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-                            <Sparkles className="w-4 h-4" />
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h2 className="font-bold text-white text-sm sm:text-base">Bhoomi AI</h2>
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            </div>
-                            <p className="text-[11px] text-neutral-400 font-mono">
-                                {isKn ? "ಕೃಷಿ ತಜ್ಞ ಸಹಾಯಕ" : "AgriVerse AI Expert"}
-                            </p>
-                        </div>
-                    </div>
+                    <span className="font-semibold text-white text-base tracking-tight">Bhoomi AI</span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -1074,10 +1039,10 @@ const ChatScreen: React.FC<{
                         <div className={cn(
                             "px-2.5 py-1 rounded-full text-xs font-mono font-medium border backdrop-blur-md hidden sm:block",
                             isQuotaLocked
-                                ? "bg-red-500/20 border-red-500/40 text-red-300"
-                                : "bg-emerald-500/20 border-emerald-500/30 text-emerald-300"
+                                ? "bg-neutral-900 border-neutral-800 text-neutral-400"
+                                : "bg-neutral-900 border-neutral-800 text-neutral-300"
                         )}>
-                            {isQuotaLocked ? "🔒 Limit Reached" : `⚡ ${remainingPrompts}/3 Left`}
+                            {isQuotaLocked ? "Limit Reached" : `Demo: ${remainingPrompts}/3 Left`}
                         </div>
                     )}
 
@@ -1091,22 +1056,19 @@ const ChatScreen: React.FC<{
                         }}
                         className={cn(
                             "rounded-xl transition-all",
-                            isVoiceEnabled ? "text-emerald-400 bg-emerald-500/10" : "text-neutral-500 hover:text-neutral-300"
+                            isVoiceEnabled ? "text-white bg-neutral-800" : "text-neutral-500 hover:text-neutral-300"
                         )}
                         title={isVoiceEnabled ? "Voice Enabled" : "Voice Muted"}
                     >
                         {isVoiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
                     </Button>
 
-                    {/* Language Switcher */}
-                    <Button
-                        variant="outline"
+                    {/* Standard Language Toggle */}
+                    <LanguageToggle
+                        currentLanguage={currentLanguage}
+                        setCurrentLanguage={setCurrentLanguage}
                         size="sm"
-                        onClick={() => setCurrentLanguage(isKn ? Language.EN : Language.KN)}
-                        className="rounded-full border-neutral-700 bg-black/50 text-xs font-mono text-neutral-200 hover:text-white hover:bg-neutral-800"
-                    >
-                        {isKn ? "EN" : "ಕನ್ನಡ"}
-                    </Button>
+                    />
 
                     {onClose && (
                         <Button
@@ -1137,20 +1099,20 @@ const ChatScreen: React.FC<{
                         >
                             {/* AI Avatar */}
                             {!isUser && (
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/20 mt-1">
-                                    <Sparkles className="w-4 h-4" />
+                                <div className="w-8 h-8 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center text-white shrink-0 shadow-lg mt-1">
+                                    <Sparkles className="w-4 h-4 text-white" />
                                 </div>
                             )}
 
                             <div className={cn(
                                 "max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 shadow-xl backdrop-blur-xl relative group",
                                 isUser 
-                                    ? "bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-tr-sm border border-emerald-400/30"
+                                    ? "bg-white text-black font-medium rounded-tr-sm border border-neutral-200 shadow-md"
                                     : "bg-neutral-900/90 text-neutral-100 rounded-tl-sm border border-neutral-800/90"
                             )}>
                                 {/* User Uploaded Attachment in Chat */}
                                 {message.attachment && (
-                                    <div className="mb-3 rounded-xl overflow-hidden border border-white/20 max-w-xs shadow-md">
+                                    <div className="mb-3 rounded-xl overflow-hidden border border-neutral-300 max-w-xs shadow-md">
                                         <img 
                                             src={typeof message.attachment === 'string' ? message.attachment : URL.createObjectURL(message.attachment)} 
                                             alt="Crop Upload" 
@@ -1166,17 +1128,17 @@ const ChatScreen: React.FC<{
 
                                 {/* Plant Disease Diagnostic Card if available */}
                                 {message.plantAnalysis && (
-                                    <div className="mt-4 pt-3 border-t border-neutral-700/60">
+                                    <div className="mt-4 pt-3 border-t border-neutral-800">
                                         <PlantAnalysisResult result={message.plantAnalysis} texts={texts} />
                                     </div>
                                 )}
 
                                 {/* Copy / Actions bar on AI messages */}
                                 {!isUser && (
-                                    <div className="mt-3 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-xs text-neutral-400">
+                                    <div className="mt-3 pt-2 border-t border-neutral-800 flex items-center justify-between text-xs text-neutral-400">
                                         <div className="flex items-center gap-2">
                                             {isSpeaking && (
-                                                <span className="flex items-center gap-1.5 text-emerald-400 font-mono">
+                                                <span className="flex items-center gap-1.5 text-neutral-300 font-mono">
                                                     <Volume2 className="w-3.5 h-3.5 animate-pulse" />
                                                     <span>Speaking...</span>
                                                 </span>
@@ -1190,8 +1152,8 @@ const ChatScreen: React.FC<{
                                         >
                                             {copiedIndex === idx ? (
                                                 <>
-                                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                                    <span className="text-emerald-400">Copied</span>
+                                                    <Check className="w-3.5 h-3.5 text-white" />
+                                                    <span className="text-white">Copied</span>
                                                 </>
                                             ) : (
                                                 <>
@@ -1207,7 +1169,7 @@ const ChatScreen: React.FC<{
                             {/* User Avatar */}
                             {isUser && (
                                 <div className="w-8 h-8 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center text-neutral-300 shrink-0 shadow-lg mt-1">
-                                    <UserCircle2 className="w-5 h-5" />
+                                    <UserCircle2 className="w-5 h-5 text-neutral-300" />
                                 </div>
                             )}
                         </motion.div>
@@ -1221,8 +1183,8 @@ const ChatScreen: React.FC<{
                         animate={{ opacity: 1, y: 0 }}
                         className="flex gap-3 items-center"
                     >
-                        <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                            <Sparkles className="w-4 h-4 animate-spin" />
+                        <div className="w-8 h-8 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center text-white shrink-0">
+                            <Sparkles className="w-4 h-4 animate-spin text-white" />
                         </div>
                         <div className="px-4 py-3 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-neutral-300 backdrop-blur-md shadow-lg flex items-center gap-3">
                             <GeneratingAnimation />
@@ -1242,19 +1204,19 @@ const ChatScreen: React.FC<{
                     <div className={cn(
                         "relative bg-black/80 backdrop-blur-2xl rounded-2xl border transition-all shadow-2xl p-2",
                         isQuotaLocked
-                            ? "border-red-500/40 bg-red-950/20"
-                            : "border-neutral-700/80 focus-within:border-emerald-500/60 focus-within:ring-1 focus-within:ring-emerald-500/30"
+                            ? "border-neutral-800 bg-neutral-950/60"
+                            : "border-neutral-800 focus-within:border-neutral-600 focus-within:ring-1 focus-within:ring-neutral-700/50"
                     )}>
                         {/* Attachment Thumbnail Preview */}
                         {attachment && (
-                            <div className="flex items-center gap-2 p-2 mb-1 bg-neutral-900/90 rounded-xl border border-neutral-800 w-fit">
+                            <div className="flex items-center gap-2 p-2 mb-1 bg-neutral-900 rounded-xl border border-neutral-800 w-fit">
                                 {attachmentPreview ? (
                                     <img src={attachmentPreview} alt="upload preview" className="w-10 h-10 object-cover rounded-lg border border-neutral-700" />
                                 ) : (
                                     <Paperclip className="w-5 h-5 text-neutral-400" />
                                 )}
                                 <span className="text-xs text-neutral-200 max-w-[150px] truncate">{attachment.name}</span>
-                                <button type="button" onClick={handleRemoveAttachment} className="p-1 hover:text-red-400 text-neutral-400">
+                                <button type="button" onClick={handleRemoveAttachment} className="p-1 hover:text-white text-neutral-400">
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
@@ -1326,10 +1288,10 @@ const ChatScreen: React.FC<{
                                     className={cn(
                                         "rounded-xl transition-all",
                                         isRecording
-                                            ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50"
+                                            ? "bg-red-600 text-white animate-pulse shadow-lg"
                                             : isTranscribing
-                                            ? "bg-purple-600 text-white animate-spin"
-                                            : "text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800/80"
+                                            ? "bg-neutral-700 text-white animate-spin"
+                                            : "text-neutral-400 hover:text-white hover:bg-neutral-800/80"
                                     )}
                                     title={isRecording ? "Stop Recording" : "Voice Input"}
                                 >
@@ -1342,7 +1304,7 @@ const ChatScreen: React.FC<{
                                     <Button
                                         type="button"
                                         onClick={onRequireAuth}
-                                        className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-lg"
+                                        className="bg-white hover:bg-neutral-200 text-black text-xs font-semibold px-4 py-2 rounded-xl shadow-lg"
                                     >
                                         {isKn ? "ಸೈನ್ ಇನ್" : "Sign In"}
                                     </Button>
@@ -1353,11 +1315,11 @@ const ChatScreen: React.FC<{
                                         className={cn(
                                             "px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-lg",
                                             (userInput.trim() || attachment)
-                                                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/20"
-                                                : "bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                                                ? "bg-white hover:bg-neutral-200 text-black font-medium"
+                                                : "bg-neutral-800 text-neutral-600 cursor-not-allowed"
                                         )}
                                     >
-                                        <ArrowUp className="w-4 h-4" />
+                                        <ArrowUp className="w-4 h-4 text-current" />
                                         <span className="text-xs font-medium hidden sm:inline">{isKn ? "ಕಳುಹಿಸಿ" : "Send"}</span>
                                     </Button>
                                 )}
@@ -1367,7 +1329,7 @@ const ChatScreen: React.FC<{
                 </form>
 
                 {speechError && (
-                    <p className="mt-2 text-xs text-red-400 text-center font-medium bg-red-950/40 py-1 px-3 rounded-full border border-red-500/20 inline-block">
+                    <p className="mt-2 text-xs text-red-300 text-center font-medium bg-neutral-900 py-1 px-3 rounded-full border border-red-500/30 inline-block">
                         {speechError}
                     </p>
                 )}
