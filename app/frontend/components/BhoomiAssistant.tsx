@@ -5,6 +5,8 @@ import { uiStrings } from '../constants';
 import Button from './common/Button';
 import LoadingSpinner from './common/LoadingSpinner';
 import { getPlantDiseaseAnalysis, generateSpeech, getBhoomiResponseStream } from '../services/geminiService';
+import { generateSarvamSpeech, transcribeSarvamAudio } from '../services/sarvamService';
+import { getGroqBhoomiStream } from '../services/groqService';
 import {
     ArrowLeftIcon, PaperClipIcon, XCircleIcon, MicrophoneIcon, PaperAirplaneIcon, SparklesIcon,
     SpeakerWaveIcon, SpeakerXMarkIcon, UserCircleIcon
@@ -69,21 +71,112 @@ const convertPCM16ToFloat32 = (pcmData: ArrayBuffer): Float32Array => {
     return float32Array;
 };
 
-// Speech Recognition Hook
-const useSpeechRecognition = (onResult: (t: string) => void, onEnd: () => void, onError: (e: string) => void, lang: Language) => {
-    const recRef = useRef<any>(null);
-    useEffect(() => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) { return; }
-        const r = new SpeechRecognition();
-        r.continuous = false; r.interimResults = false;
-        r.lang = lang === Language.KN ? 'kn-IN' : 'en-US';
-        r.onresult = (e: any) => onResult(e.results[0][0].transcript);
-        r.onend = onEnd;
-        r.onerror = (e: any) => { onError(e.error); onEnd(); };
-        recRef.current = r;
-    }, [lang, onResult, onEnd, onError]);
-    return { startRecognition: useCallback(() => { if (recRef.current) { try { recRef.current.start(); } catch (e) { console.error(e); onEnd(); } } }, [onEnd]) };
+// High-Accuracy Speech Recognition Hook powered by Sarvam AI Saaras:v3
+const useSarvamAudioRecorder = (
+    onResult: (t: string) => void,
+    onRecordingChange: (recording: boolean) => void,
+    onTranscribingChange: (transcribing: boolean) => void,
+    onError: (e: string) => void,
+    lang: Language
+) => {
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+    const streamRef = useRef<MediaStream | null>(null);
+    const silenceTimerRef = useRef<any>(null);
+
+    const startRecording = useCallback(async () => {
+        try {
+            audioChunksRef.current = [];
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+            streamRef.current = stream;
+
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus'
+                : MediaRecorder.isTypeSupported('audio/mp4')
+                ? 'audio/mp4'
+                : '';
+
+            const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+            mediaRecorderRef.current = recorder;
+
+            recorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                    audioChunksRef.current.push(e.data);
+                }
+            };
+
+            recorder.onstop = async () => {
+                onRecordingChange(false);
+                if (streamRef.current) {
+                    streamRef.current.getTracks().forEach(track => track.stop());
+                    streamRef.current = null;
+                }
+
+                const audioBlob = new Blob(audioChunksRef.current, {
+                    type: recorder.mimeType || 'audio/webm'
+                });
+
+                if (audioBlob.size < 500) {
+                    return;
+                }
+
+                onTranscribingChange(true);
+                try {
+                    console.log("Transcribing audio with Sarvam Saaras:v3...");
+                    const transcript = await transcribeSarvamAudio(audioBlob, lang);
+                    onTranscribingChange(false);
+                    if (transcript && transcript.trim()) {
+                        onResult(transcript.trim());
+                    } else {
+                        onError("No speech detected. Please speak closer to the mic.");
+                    }
+                } catch (err: any) {
+                    onTranscribingChange(false);
+                    console.warn("Sarvam STT failed:", err);
+                    onError("Could not transcribe speech. Please try again or type.");
+                }
+            };
+
+            recorder.start(200);
+            onRecordingChange(true);
+
+            // Auto stop after 8 seconds of continuous recording
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = setTimeout(() => {
+                if (recorder.state === 'recording') {
+                    recorder.stop();
+                }
+            }, 8000);
+
+        } catch (err: any) {
+            console.error("Microphone access error:", err);
+            onRecordingChange(false);
+            onError("Microphone permission needed to use voice input.");
+        }
+    }, [lang, onResult, onRecordingChange, onTranscribingChange, onError]);
+
+    const stopRecording = useCallback(() => {
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+        }
+    }, []);
+
+    const toggleRecording = useCallback((isCurrentlyRecording: boolean) => {
+        if (isCurrentlyRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    }, [startRecording, stopRecording]);
+
+    return { startRecording, stopRecording, toggleRecording };
 };
 
 interface BhoomiAssistantProps {
@@ -93,50 +186,73 @@ interface BhoomiAssistantProps {
 }
 
 // Listening View
-const ListeningView: React.FC<{ texts: UIStringContent; speechError: string | null }> = ({ texts, speechError }) => {
+const ListeningView: React.FC<{
+    texts: UIStringContent;
+    speechError: string | null;
+    isTranscribing?: boolean;
+    onStop?: () => void;
+}> = ({ texts, speechError, isTranscribing, onStop }) => {
     return (
         <motion.div
             key="listening-view"
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center listening-overlay-bg rounded-2xl backdrop-blur-xl bg-black/60"
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center listening-overlay-bg rounded-2xl backdrop-blur-xl bg-black/70 cursor-pointer"
+            onClick={onStop}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.4 } }}
+            exit={{ opacity: 0, transition: { duration: 0.3 } }}
             transition={{ duration: 0.2 }}
         >
             <motion.p
-                className="text-white text-3xl font-light mb-12 tracking-wide"
+                className="text-white text-3xl font-light mb-12 tracking-wide text-center"
                 initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0, transition: { delay: 0.2 } }}
+                animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
             >
-                {texts.listening}
+                {isTranscribing ? "Recognizing speech with Sarvam AI..." : texts.listening}
             </motion.p>
 
             <ListeningAnimation />
 
             <motion.div
-                className="absolute bottom-20"
+                className="absolute bottom-16 flex flex-col items-center gap-3"
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: { delay: 0.3 } }}
+                animate={{ opacity: 1, transition: { delay: 0.2 } }}
             >
-                <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 animate-pulse">
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onStop?.();
+                    }}
+                    className="w-20 h-20 bg-gradient-to-r from-red-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 animate-pulse hover:scale-105 active:scale-95 transition-transform"
+                    aria-label="Stop recording"
+                >
                     <MicrophoneIcon className="w-10 h-10 text-white" />
-                </div>
+                </button>
+                <span className="text-sm text-blue-200/80 font-medium bg-black/40 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">
+                    Click anywhere or mic to Stop & Send
+                </span>
             </motion.div>
 
-            {speechError && <div className="absolute top-10 text-red-200 bg-red-900/40 border border-red-500/30 px-6 py-3 rounded-xl backdrop-blur-md">{speechError}</div>}
+            {speechError && (
+                <div className="absolute top-10 text-red-200 bg-red-900/50 border border-red-500/30 px-6 py-3 rounded-xl backdrop-blur-md">
+                    {speechError}
+                </div>
+            )}
         </motion.div>
     );
 };
 
 // Assistant Home Screen
 const AssistantHomeScreen: React.FC<{
-    user: UserProfile; texts: UIStringContent; currentLanguage: Language;
+    user: UserProfile;
+    texts: UIStringContent;
+    currentLanguage: Language;
     onStartConversation: (p: string, a: File | null) => void;
-    isRecording: boolean; setIsRecording: (i: boolean) => void;
-    speechError: string | null; setSpeechError: (e: string | null) => void;
-    onSpeechError: (e: string) => void;
-    onCancelSpeak: () => void;
-}> = ({ user, texts, currentLanguage, onStartConversation, isRecording, setIsRecording, speechError, setSpeechError, onSpeechError, onCancelSpeak }) => {
+    isRecording: boolean;
+    isTranscribing: boolean;
+    onToggleRecording: () => void;
+    speechError: string | null;
+}> = ({ user, texts, currentLanguage, onStartConversation, isRecording, isTranscribing, onToggleRecording, speechError }) => {
     const [userInput, setUserInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,18 +265,16 @@ const AssistantHomeScreen: React.FC<{
         return () => clearInterval(interval);
     }, [texts.agriculturalFacts.length]);
 
-    const handleVoiceResult = (transcript: string) => onStartConversation(transcript, null);
-    const handleVoiceEnd = () => setIsRecording(false);
-    const { startRecognition } = useSpeechRecognition(handleVoiceResult, handleVoiceEnd, onSpeechError, currentLanguage);
-
-    const handleMicClick = () => {
-        onCancelSpeak();
-        setSpeechError(null);
-        setIsRecording(true);
-        startRecognition();
+    const handleSubmit = () => {
+        if (userInput.trim() || attachment) {
+            onStartConversation(userInput, attachment);
+            setUserInput('');
+            setAttachment(null);
+        }
     };
-    const handleSubmit = () => { if (userInput.trim() || attachment) onStartConversation(userInput, attachment); };
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files?.[0]) setAttachment(e.target.files[0]); };
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) setAttachment(e.target.files[0]);
+    };
 
     return (
         <div className="flex flex-col h-full bhoomi-galaxy-container text-white p-4 md:p-8 overflow-hidden">
@@ -204,7 +318,7 @@ const AssistantHomeScreen: React.FC<{
                                 type="text"
                                 value={userInput}
                                 onChange={(e) => setUserInput(e.target.value)}
-                                placeholder={texts.messagePlaceholder}
+                                placeholder={isTranscribing ? "Recognizing speech with Sarvam AI..." : isRecording ? "Listening... Click mic again to stop" : texts.messagePlaceholder}
                                 className="relative w-full pl-6 pr-40 py-4 bg-transparent text-white placeholder-blue-200/50 text-lg border-none focus:ring-0 focus:outline-none"
                             />
                             <div className="absolute top-1/2 right-3 transform -translate-y-1/2 flex items-center gap-2">
@@ -214,7 +328,12 @@ const AssistantHomeScreen: React.FC<{
                                     <PaperClipIcon className="w-6 h-6" />
                                 </button>
 
-                                <button type="button" onClick={handleMicClick} disabled={isRecording} className={`p-3 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40' : 'text-blue-300 hover:text-white hover:bg-white/10'}`} aria-label={texts.askWithVoice}>
+                                <button
+                                    type="button"
+                                    onClick={onToggleRecording}
+                                    className={`p-3 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40 ring-2 ring-red-400' : isTranscribing ? 'bg-purple-600 text-white animate-spin' : 'text-blue-300 hover:text-white hover:bg-white/10'}`}
+                                    aria-label={texts.askWithVoice}
+                                >
                                     <MicrophoneIcon className="w-6 h-6" />
                                 </button>
 
@@ -261,13 +380,28 @@ const AssistantHomeScreen: React.FC<{
 
 // Assistant Chat Screen
 const ChatScreen: React.FC<{
-    texts: UIStringContent; currentLanguage: Language; history: ChatMessage[]; isLoading: boolean;
-    onSendMessage: (m: string, a: File | null) => void; isVoiceEnabled: boolean; setIsVoiceEnabled: (e: boolean) => void;
-    isRecording: boolean; setIsRecording: (i: boolean) => void; isSpeaking: boolean; onCancelSpeak: () => void; setCurrentLanguage: (l: Language) => void;
-    onGoHome: () => void; speechError: string | null; setSpeechError: (e: string | null) => void;
-    onSpeechError: (e: string) => void;
+    texts: UIStringContent;
+    currentLanguage: Language;
+    history: ChatMessage[];
+    isLoading: boolean;
+    onSendMessage: (m: string, a: File | null) => void;
+    isVoiceEnabled: boolean;
+    setIsVoiceEnabled: (e: boolean) => void;
+    isRecording: boolean;
+    isTranscribing: boolean;
+    onToggleRecording: () => void;
+    isSpeaking: boolean;
+    onCancelSpeak: () => void;
+    setCurrentLanguage: (l: Language) => void;
+    onGoHome: () => void;
+    speechError: string | null;
 }> = (props) => {
-    const { texts, currentLanguage, history, isLoading, onSendMessage, isVoiceEnabled, setIsVoiceEnabled, isRecording, setIsRecording, isSpeaking, onCancelSpeak, setCurrentLanguage, onGoHome, speechError, setSpeechError, onSpeechError } = props;
+    const {
+        texts, currentLanguage, history, isLoading, onSendMessage,
+        isVoiceEnabled, setIsVoiceEnabled, isRecording, isTranscribing,
+        onToggleRecording, isSpeaking, onCancelSpeak, setCurrentLanguage,
+        onGoHome, speechError
+    } = props;
     const [userInput, setUserInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -278,16 +412,15 @@ const ChatScreen: React.FC<{
         if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }, [history]);
 
-    const handleSendClick = () => { onSendMessage(userInput, attachment); setUserInput(''); setAttachment(null); };
-    const handleVoiceResult = (transcript: string) => onSendMessage(transcript, null);
-    const handleVoiceEnd = () => setIsRecording(false);
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files?.[0]) setAttachment(e.target.files[0]); };
-    const { startRecognition } = useSpeechRecognition(handleVoiceResult, handleVoiceEnd, onSpeechError, currentLanguage);
-    const handleMicClick = () => {
-        onCancelSpeak();
-        setSpeechError(null);
-        setIsRecording(true);
-        startRecognition();
+    const handleSendClick = () => {
+        if (userInput.trim() || attachment) {
+            onSendMessage(userInput, attachment);
+            setUserInput('');
+            setAttachment(null);
+        }
+    };
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) setAttachment(e.target.files[0]);
     };
 
     const isGenerating = isLoading && history.length > 0 && history[history.length - 1].role === 'user';
@@ -458,14 +591,20 @@ const ChatScreen: React.FC<{
                             value={userInput}
                             onChange={e => setUserInput(e.target.value)}
                             onKeyPress={e => e.key === 'Enter' && !isLoading && handleSendClick()}
-                            placeholder={texts.messagePlaceholder}
-                            disabled={isLoading}
-                            className="flex-grow px-3 py-2 text-base bg-transparent border-none focus:outline-none focus:ring-0 text-white placeholder-blue-200/30"
+                            placeholder={isTranscribing ? "Recognizing speech with Sarvam AI..." : isRecording ? "Listening... Click mic to send" : texts.messagePlaceholder}
+                            disabled={isLoading || isTranscribing}
+                            className="flex-grow px-3 py-2 text-base bg-transparent border-none focus:outline-none focus:ring-0 text-white placeholder-blue-200/50"
                         />
 
                         <div className="h-8 w-[1px] bg-white/10 mx-1"></div>
 
-                        <button onClick={handleMicClick} disabled={isRecording || isLoading} className={`p-3 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' : 'text-blue-300 hover:text-white hover:bg-white/10'}`} aria-label={texts.askWithVoice}>
+                        <button 
+                            type="button"
+                            onClick={onToggleRecording} 
+                            disabled={isLoading || isTranscribing} 
+                            className={`p-3 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40 ring-2 ring-red-400' : isTranscribing ? 'bg-purple-600 text-white animate-spin' : 'text-blue-300 hover:text-white hover:bg-white/10'}`} 
+                            aria-label={texts.askWithVoice}
+                        >
                             <MicrophoneIcon className="w-6 h-6" />
                         </button>
 
@@ -485,6 +624,7 @@ interface TTSPlaylistItem {
     index: number;
     text: string;
     base64Data?: string;
+    isWav?: boolean;
     status: 'pending' | 'resolved' | 'failed';
 }
 
@@ -497,6 +637,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
     const [isLoading, setIsLoading] = useState(false);
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
     const [isRecording, setIsRecording] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [speechError, setSpeechError] = useState<string | null>(null);
     const isSendingRef = useRef(false);
@@ -533,14 +674,32 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         return audioContextRef.current;
     };
 
+    // Native browser Web Speech API fallback
+    const speakBrowserFallback = useCallback((text: string, onEnd: () => void) => {
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = currentLanguage === Language.KN ? 'kn-IN' : 'en-IN';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.05;
+            utterance.onend = () => onEnd();
+            utterance.onerror = () => onEnd();
+            window.speechSynthesis.speak(utterance);
+        } else {
+            onEnd();
+        }
+    }, [currentLanguage]);
+
     // Stop speaking, clear state and increment session ID to invalidate pending TTS requests
     const handleCancelSpeak = useCallback(() => {
-        console.log("Cancelling speech playback and invalidating current session ID");
         currentSessionIdRef.current += 1;
         playlistRef.current = [];
         nextPlayIndexRef.current = 0;
         isPlayingAudioRef.current = false;
         setIsSpeaking(false);
+
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
 
         if (activeSourceNodeRef.current) {
             try {
@@ -552,44 +711,27 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         }
     }, []);
 
-    // Play next item in the playlist
-    const processPlaylist = useCallback((sessionId: number) => {
-        if (currentSessionIdRef.current !== sessionId) return;
-        if (isPlayingAudioRef.current) return;
-
-        const nextItem = playlistRef.current.find(p => p.index === nextPlayIndexRef.current);
-        if (!nextItem) {
-            // Check if all items in playlist are completed, if so set isSpeaking to false
-            const allCompleted = playlistRef.current.every(p => p.status === 'resolved' || p.status === 'failed');
-            if (allCompleted && playlistRef.current.length > 0) {
-                setIsSpeaking(false);
-            }
-            return;
-        }
-
-        if (nextItem.status === 'resolved' && nextItem.base64Data) {
-            nextPlayIndexRef.current++;
-            playPCM(nextItem.base64Data, nextItem.text, sessionId);
-        } else if (nextItem.status === 'failed') {
-            nextPlayIndexRef.current++;
-            // Try playing the next one asynchronously
-            setTimeout(() => processPlaylist(sessionId), 0);
-        }
-        // If pending, we just wait until the async fetch updates the playlist status
-    }, []);
-
-    // Core play PCM via AudioContext
-    const playPCM = (base64Data: string, text: string, sessionId: number) => {
+    // Core play PCM or WAV via Web Audio API
+    const playAudioBuffer = async (base64Data: string, isWav: boolean, text: string, sessionId: number) => {
         isPlayingAudioRef.current = true;
         setIsSpeaking(true);
 
         try {
             const audioCtx = getAudioContext();
             const arrayBuffer = base64ToArrayBuffer(base64Data);
-            const float32Data = convertPCM16ToFloat32(arrayBuffer);
+            let audioBuffer: AudioBuffer;
 
-            const audioBuffer = audioCtx.createBuffer(1, float32Data.length, 24000);
-            audioBuffer.copyToChannel(float32Data, 0);
+            if (isWav) {
+                // Sarvam AI returns standard WAV audio
+                audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            } else {
+                // Gemini TTS returns raw 24kHz PCM16 audio
+                const float32Data = convertPCM16ToFloat32(arrayBuffer);
+                audioBuffer = audioCtx.createBuffer(1, float32Data.length, 24000);
+                audioBuffer.copyToChannel(float32Data, 0);
+            }
+
+            if (currentSessionIdRef.current !== sessionId) return;
 
             const source = audioCtx.createBufferSource();
             source.buffer = audioBuffer;
@@ -605,22 +747,66 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
 
             source.start(0);
         } catch (err) {
-            console.error("Playback error:", err);
-            isPlayingAudioRef.current = false;
-            processPlaylist(sessionId);
+            console.warn("AudioBuffer decode error, falling back to Web Speech:", err);
+            speakBrowserFallback(text, () => {
+                if (currentSessionIdRef.current === sessionId) {
+                    isPlayingAudioRef.current = false;
+                    processPlaylist(sessionId);
+                }
+            });
         }
     };
 
-    // Async fetch TTS chunk and update playlist
+    // Play next item in the playlist
+    const processPlaylist = useCallback((sessionId: number) => {
+        if (currentSessionIdRef.current !== sessionId) return;
+        if (isPlayingAudioRef.current) return;
+
+        const nextItem = playlistRef.current.find(p => p.index === nextPlayIndexRef.current);
+        if (!nextItem) {
+            const allCompleted = playlistRef.current.every(p => p.status === 'resolved' || p.status === 'failed');
+            if (allCompleted && playlistRef.current.length > 0) {
+                setIsSpeaking(false);
+            }
+            return;
+        }
+
+        if (nextItem.status === 'resolved' && nextItem.base64Data) {
+            nextPlayIndexRef.current++;
+            playAudioBuffer(nextItem.base64Data, !!nextItem.isWav, nextItem.text, sessionId);
+        } else if (nextItem.status === 'failed') {
+            nextPlayIndexRef.current++;
+            // Use instant browser speech synthesis fallback for failed chunks
+            isPlayingAudioRef.current = true;
+            setIsSpeaking(true);
+            speakBrowserFallback(nextItem.text, () => {
+                if (currentSessionIdRef.current === sessionId) {
+                    isPlayingAudioRef.current = false;
+                    processPlaylist(sessionId);
+                }
+            });
+        }
+    }, [speakBrowserFallback]);
+
+    // Async fetch TTS chunk from Sarvam AI with fallback to Gemini TTS
     const fetchSpeech = async (text: string, index: number, sessionId: number) => {
         try {
-            console.log(`[TTS Fetch] Dispatched index: ${index}, text: "${text.substring(0, 30)}..."`);
-            const base64 = await generateSpeech(text);
+            // 1. Primary: Sarvam AI Bulbul (ultra-natural Indian conversational voice)
+            let base64 = await generateSarvamSpeech(text, currentLanguage);
+            let isWav = true;
+
+            // 2. Secondary: Gemini 2.5 Flash TTS
+            if (!base64) {
+                base64 = await generateSpeech(text);
+                isWav = false;
+            }
+
             if (currentSessionIdRef.current !== sessionId) return;
 
             const entry = playlistRef.current.find(p => p.index === index);
             if (entry) {
-                entry.base64Data = base64;
+                entry.base64Data = base64 || undefined;
+                entry.isWav = isWav;
                 entry.status = base64 ? 'resolved' : 'failed';
             }
             processPlaylist(sessionId);
@@ -643,14 +829,7 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
         const idx = playlistRef.current.length;
         playlistRef.current.push({ index: idx, text, status: 'pending' });
         fetchSpeech(text, idx, sessionId);
-    }, []);
-
-    const handleSpeechError = (error: string) => {
-        let message = texts.errorSpeechGeneric;
-        if (error === 'network') message = texts.errorSpeechNetwork;
-        setSpeechError(message);
-        setTimeout(() => setSpeechError(null), 4000);
-    };
+    }, [currentLanguage]);
 
     const handleSendMessage = useCallback(async (message: string, attachment: File | null) => {
         if (isSendingRef.current || isLoading) return;
@@ -690,12 +869,12 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
             return;
         }
 
-        // Standard text-based chat with Gemini Streaming and Sentence TTS Pipelining
+        // Standard text-based chat with Ultra-Fast Groq / Gemini Streaming & Sentence TTS Pipelining
         try {
             const modelMessageId = `model-${Date.now()}`;
             setHistory(prev => [...prev, { id: modelMessageId, role: 'model', text: '' }]);
 
-            // Initialize/unlock audio context on user interaction (since they clicked the button)
+            // Initialize/unlock audio context on user interaction
             if (isVoiceEnabled) {
                 try {
                     getAudioContext();
@@ -704,48 +883,99 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                 }
             }
 
-            const responseStream = await getBhoomiResponseStream(
-                [...history, userMessage],
-                currentLanguage
-            );
-
             let fullResponse = '';
             let chunkBuffer = '';
             let sentenceIndex = 0;
             const sessionIdAtStreamStart = currentSessionIdRef.current;
 
-            for await (const chunk of responseStream) {
-                if (currentSessionIdRef.current !== sessionIdAtStreamStart) break;
+            // Try Groq streaming first (sub-200ms latency)
+            let usedGroq = false;
+            try {
+                const groqStream = getGroqBhoomiStream(
+                    [...history, userMessage],
+                    currentLanguage
+                );
 
-                const text = chunk.text;
-                if (text) {
-                    fullResponse += text;
-                    chunkBuffer += text;
+                for await (const chunk of groqStream) {
+                    usedGroq = true;
+                    if (currentSessionIdRef.current !== sessionIdAtStreamStart) break;
 
-                    // Update UI immediately (streaming response)
-                    setHistory(prev => prev.map(m => m.id === modelMessageId ? { ...m, text: fullResponse } : m));
+                    const text = chunk.text;
+                    if (text) {
+                        fullResponse += text;
+                        chunkBuffer += text;
 
-                    if (isVoiceEnabled) {
-                        // Regex matches periods, question marks, exclamation marks, Kannada danda, or newlines.
-                        const delimiters = /[.?!।\n]/;
-                        if (delimiters.test(chunkBuffer)) {
-                            const parts = chunkBuffer.split(/([.?!।\n])/);
-                            while (parts.length > 2) {
-                                const sentenceText = (parts.shift() || '') + (parts.shift() || '');
-                                const trimmed = sentenceText.trim();
-                                if (trimmed && trimmed.length > 1) {
-                                    const plainSentence = removeMarkdown(trimmed)
-                                        .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
-                                        .trim();
-                                    
-                                    if (plainSentence) {
-                                        const idx = sentenceIndex++;
-                                        playlistRef.current.push({ index: idx, text: plainSentence, status: 'pending' });
-                                        fetchSpeech(plainSentence, idx, sessionIdAtStreamStart);
+                        // Update UI immediately (streaming response)
+                        setHistory(prev => prev.map(m => m.id === modelMessageId ? { ...m, text: fullResponse } : m));
+
+                        if (isVoiceEnabled) {
+                            const delimiters = /[.?!।\n]/;
+                            if (delimiters.test(chunkBuffer)) {
+                                const parts = chunkBuffer.split(/([.?!।\n])/);
+                                while (parts.length > 2) {
+                                    const sentenceText = (parts.shift() || '') + (parts.shift() || '');
+                                    const trimmed = sentenceText.trim();
+                                    if (trimmed && trimmed.length > 1) {
+                                        const plainSentence = removeMarkdown(trimmed)
+                                            .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
+                                            .trim();
+                                        
+                                        if (plainSentence) {
+                                            const idx = sentenceIndex++;
+                                            playlistRef.current.push({ index: idx, text: plainSentence, status: 'pending' });
+                                            fetchSpeech(plainSentence, idx, sessionIdAtStreamStart);
+                                        }
                                     }
                                 }
+                                chunkBuffer = parts.join('');
                             }
-                            chunkBuffer = parts.join('');
+                        }
+                    }
+                }
+            } catch (groqErr) {
+                console.warn("Groq streaming failed, falling back to Gemini 2.5 Flash:", groqErr);
+            }
+
+            // Fallback to Gemini 2.5 Flash if Groq was not used or failed before producing tokens
+            if (!usedGroq || !fullResponse) {
+                fullResponse = '';
+                chunkBuffer = '';
+                const responseStream = await getBhoomiResponseStream(
+                    [...history, userMessage],
+                    currentLanguage
+                );
+
+                for await (const chunk of responseStream) {
+                    if (currentSessionIdRef.current !== sessionIdAtStreamStart) break;
+
+                    const text = chunk.text;
+                    if (text) {
+                        fullResponse += text;
+                        chunkBuffer += text;
+
+                        setHistory(prev => prev.map(m => m.id === modelMessageId ? { ...m, text: fullResponse } : m));
+
+                        if (isVoiceEnabled) {
+                            const delimiters = /[.?!।\n]/;
+                            if (delimiters.test(chunkBuffer)) {
+                                const parts = chunkBuffer.split(/([.?!।\n])/);
+                                while (parts.length > 2) {
+                                    const sentenceText = (parts.shift() || '') + (parts.shift() || '');
+                                    const trimmed = sentenceText.trim();
+                                    if (trimmed && trimmed.length > 1) {
+                                        const plainSentence = removeMarkdown(trimmed)
+                                            .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
+                                            .trim();
+                                        
+                                        if (plainSentence) {
+                                            const idx = sentenceIndex++;
+                                            playlistRef.current.push({ index: idx, text: plainSentence, status: 'pending' });
+                                            fetchSpeech(plainSentence, idx, sessionIdAtStreamStart);
+                                        }
+                                    }
+                                }
+                                chunkBuffer = parts.join('');
+                            }
                         }
                     }
                 }
@@ -764,13 +994,41 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
             }
 
         } catch (e: any) {
-            console.error("Gemini Streaming Error:", e);
+            console.error("Streaming Error:", e);
             setHistory(prev => [...prev, { id: `model-err-${Date.now()}`, role: 'model', text: `${texts.errorPrefix} ${e.message}` }]);
         } finally {
             setIsLoading(false);
             isSendingRef.current = false;
         }
     }, [currentLanguage, history, isVoiceEnabled, queueSpeech, texts, isLoading]);
+
+    const handleVoiceResult = useCallback((transcript: string) => {
+        if (transcript && transcript.trim()) {
+            handleSendMessage(transcript.trim(), null);
+        }
+    }, [handleSendMessage]);
+
+    const handleSpeechError = useCallback((error: string) => {
+        let message = texts.errorSpeechGeneric;
+        if (error === 'network') message = texts.errorSpeechNetwork;
+        else if (error) message = error;
+        setSpeechError(message);
+        setTimeout(() => setSpeechError(null), 4000);
+    }, [texts]);
+
+    const { stopRecording, toggleRecording } = useSarvamAudioRecorder(
+        handleVoiceResult,
+        setIsRecording,
+        setIsTranscribing,
+        handleSpeechError,
+        currentLanguage
+    );
+
+    const handleMicToggle = useCallback(() => {
+        handleCancelSpeak();
+        setSpeechError(null);
+        toggleRecording(isRecording);
+    }, [handleCancelSpeak, toggleRecording, isRecording]);
 
     const goHome = () => {
         handleCancelSpeak();
@@ -790,11 +1048,9 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                             currentLanguage={currentLanguage}
                             onStartConversation={handleSendMessage}
                             isRecording={isRecording}
-                            setIsRecording={setIsRecording}
+                            isTranscribing={isTranscribing}
+                            onToggleRecording={handleMicToggle}
                             speechError={speechError}
-                            setSpeechError={setSpeechError}
-                            onSpeechError={handleSpeechError}
-                            onCancelSpeak={handleCancelSpeak}
                         />
                     </motion.div>
                 ) : (
@@ -808,21 +1064,27 @@ const BhoomiAssistant: React.FC<BhoomiAssistantProps> = (props) => {
                             isVoiceEnabled={isVoiceEnabled}
                             setIsVoiceEnabled={setIsVoiceEnabled}
                             isRecording={isRecording}
-                            setIsRecording={setIsRecording}
+                            isTranscribing={isTranscribing}
+                            onToggleRecording={handleMicToggle}
                             isSpeaking={isSpeaking}
                             onCancelSpeak={handleCancelSpeak}
                             setCurrentLanguage={setCurrentLanguage}
                             onGoHome={goHome}
                             speechError={speechError}
-                            setSpeechError={setSpeechError}
-                            onSpeechError={handleSpeechError}
                         />
                     </motion.div>
                 )}
             </AnimatePresence>
 
             <AnimatePresence>
-                {isRecording && <ListeningView texts={texts} speechError={speechError} />}
+                {isRecording && (
+                    <ListeningView
+                        texts={texts}
+                        speechError={speechError}
+                        isTranscribing={isTranscribing}
+                        onStop={stopRecording}
+                    />
+                )}
             </AnimatePresence>
         </div>
     );

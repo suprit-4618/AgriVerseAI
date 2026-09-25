@@ -3,12 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { BellIcon, XCircleIcon, CheckCircleIcon, ExclamationTriangleIcon, InformationCircleIcon } from './common/IconComponents';
 import { UserProfile, Notification } from '../types';
 import { notificationService } from '../services/notificationService';
+import { useLanguage } from '../context/LanguageContext';
 
 interface NotificationCenterProps {
     user: UserProfile;
 }
 
 const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
+    const { isKannada } = useLanguage();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -49,10 +51,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
 
     const getIcon = (type: string) => {
         switch (type) {
-            case 'success': return <CheckCircleIcon className="w-5 h-5 text-green-500" />;
-            case 'warning': return <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500" />;
-            case 'error': return <XCircleIcon className="w-5 h-5 text-red-500" />;
-            default: return <InformationCircleIcon className="w-5 h-5 text-blue-500" />;
+            case 'success': return <CheckCircleIcon className="w-4 h-4 text-white" />;
+            case 'warning': return <ExclamationTriangleIcon className="w-4 h-4 text-neutral-300" />;
+            case 'error': return <XCircleIcon className="w-4 h-4 text-neutral-400" />;
+            default: return <InformationCircleIcon className="w-4 h-4 text-white" />;
         }
     };
 
@@ -60,11 +62,12 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="relative p-2 text-gray-600 hover:text-green-600 transition-colors rounded-full hover:bg-green-50"
+                className="relative p-2 text-neutral-400 hover:text-white transition-colors rounded-lg bg-neutral-900 border border-neutral-800 hover:bg-neutral-800"
+                title={isKannada ? "ಸೂಚನೆಗಳು" : "Notifications"}
             >
-                <BellIcon className="w-6 h-6" />
+                <BellIcon className="w-4 h-4" />
                 {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-black text-[9px] font-mono font-bold rounded-full flex items-center justify-center">
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
@@ -77,42 +80,46 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50"
+                        className="absolute right-0 mt-2 w-80 md:w-96 bg-neutral-950 rounded-2xl shadow-2xl border border-neutral-800 overflow-hidden z-50 font-mono"
                     >
-                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                            <h3 className="font-semibold text-gray-800">Notifications</h3>
-                            <span className="text-xs text-gray-500">{unreadCount} unread</span>
+                        <div className="p-3.5 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/60">
+                            <h3 className="font-bold text-xs uppercase tracking-wider text-white">
+                                {isKannada ? "ಸೂಚನೆಗಳು" : "Notifications"}
+                            </h3>
+                            <span className="text-[10px] text-neutral-400">
+                                {unreadCount} {isKannada ? "ಓದಿಲ್ಲ" : "unread"}
+                            </span>
                         </div>
 
                         <div className="max-h-96 overflow-y-auto">
                             {notifications.length === 0 ? (
-                                <div className="p-8 text-center text-gray-500">
-                                    <p>No notifications yet</p>
+                                <div className="p-8 text-center text-neutral-500 text-xs">
+                                    <p>{isKannada ? "ಯಾವುದೇ ಹೊಸ ಸೂಚನೆಗಳಿಲ್ಲ" : "No notifications yet"}</p>
                                 </div>
                             ) : (
-                                <ul className="divide-y divide-gray-100">
+                                <ul className="divide-y divide-neutral-900">
                                     {notifications.map(notification => (
                                         <li
                                             key={notification.id}
-                                            className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${notification.read ? 'opacity-60' : 'bg-blue-50/30'}`}
+                                            className={`p-3.5 hover:bg-neutral-900/50 transition-colors cursor-pointer ${notification.read ? 'opacity-50' : 'bg-neutral-900/20'}`}
                                             onClick={() => !notification.read && handleMarkAsRead(notification.id)}
                                         >
                                             <div className="flex gap-3">
-                                                <div className="flex-shrink-0 mt-1">
+                                                <div className="flex-shrink-0 mt-0.5">
                                                     {getIcon(notification.type)}
                                                 </div>
                                                 <div className="flex-1">
-                                                    <h4 className={`text-sm font-medium ${notification.read ? 'text-gray-700' : 'text-gray-900'}`}>
+                                                    <h4 className={`text-xs font-bold ${notification.read ? 'text-neutral-400' : 'text-white'}`}>
                                                         {notification.title}
                                                     </h4>
-                                                    <p className="text-xs text-gray-500 mt-1">{notification.message}</p>
-                                                    <p className="text-[10px] text-gray-400 mt-2">
-                                                        {new Date(notification.createdAt).toLocaleString()}
+                                                    <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">{notification.message}</p>
+                                                    <p className="text-[9px] text-neutral-500 mt-1.5">
+                                                        {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </p>
                                                 </div>
                                                 {!notification.read && (
                                                     <div className="flex-shrink-0 self-center">
-                                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                        <div className="w-1.5 h-1.5 bg-white rounded-full" />
                                                     </div>
                                                 )}
                                             </div>
@@ -129,3 +136,4 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
 };
 
 export default NotificationCenter;
+

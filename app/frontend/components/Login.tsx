@@ -1,71 +1,115 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db } from '../services/firebaseClient';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { 
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    GoogleAuthProvider, 
+    signInWithPopup, 
+    onAuthStateChanged 
+} from 'firebase/auth';
+import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { UserProfile, UserRole, Language } from '../types';
-import { BuildingIcon, UserCircleIcon, ShieldCheckIcon, ArrowLeftIcon, GoogleIcon } from './common/IconComponents';
-import './Login.css';
+import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, GoogleIcon } from './common/IconComponents';
 import LandingPage from './LandingPage';
 import { uiStrings } from '../constants';
 import LanguageToggle from './common/LanguageToggle';
+import { useLanguage } from '../context/LanguageContext';
 
 interface LoginProps {
     onLoginSuccess: (user: UserProfile) => void;
 }
 
-type ViewState = 'intro' | 'role-selection' | 'buyer' | 'seller' | 'admin';
+type ViewState = 'intro' | 'role-selection' | 'buyer' | 'seller';
 type AuthMode = 'login' | 'signup';
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+    const { language: currentLanguage, setLanguage: setCurrentLanguage, texts, authTexts: t, isKannada } = useLanguage();
+
     const [view, setView] = useState<ViewState>('intro');
     const [authMode, setAuthMode] = useState<AuthMode>('login');
-    const [currentLanguage, setCurrentLanguage] = useState<Language>(Language.EN);
 
     // Form States
-    const [email, setEmail] = useState('');
+    const [identifier, setIdentifier] = useState(''); // Email or Phone Number for login
+    const [email, setEmail] = useState('');           // Email for signup
+    const [phoneNumber, setPhoneNumber] = useState(''); // Phone for signup
     const [password, setPassword] = useState('');
     const [firstName, setFirstName] = useState('');
-    const [middleName, setMiddleName] = useState('');
     const [lastName, setLastName] = useState('');
 
     // UI States
     const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-    const texts = uiStrings[currentLanguage];
-
     useEffect(() => {
-        // Clear form when view changes
+        // Clear forms on view change
+        setIdentifier('');
         setEmail('');
+        setPhoneNumber('');
         setPassword('');
         setFirstName('');
-        setMiddleName('');
         setLastName('');
         setStatusMessage(null);
-        setAuthMode('login');
-    }, [view]);
+    }, [view, authMode]);
 
+    const getRoleString = (currentView: ViewState): string => {
+        switch (currentView) {
+            case 'buyer': return 'buyer';
+            case 'seller': return 'seller';
+            default: return 'user';
+        }
+    };
+
+    const mapRoleToUserRole = (roleString?: string): UserRole => {
+        switch (roleString?.toLowerCase()) {
+            case 'buyer': return UserRole.BUYER;
+            case 'seller':
+            case 'farmer':
+            case 'user': 
+                return UserRole.USER;
+            case 'admin': return UserRole.ADMIN;
+            default: return UserRole.USER;
+        }
+    };
+
+    const handleRoleSelect = (role: ViewState) => {
+        setView(role);
+        if (role === 'buyer' || role === 'seller') {
+            const portalRole = getRoleString(role);
+            sessionStorage.setItem('ava_active_portal_role', portalRole);
+            localStorage.setItem('ava_active_portal_role', portalRole);
+        }
+    };
+
+    // Listen for auth state changes from Firebase
     useEffect(() => {
-        // Listen for auth state changes from Firebase
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 try {
                     const userDocRef = doc(db, 'users', user.uid);
                     const userDoc = await getDoc(userDocRef);
                     
-                    let userRole = 'user';
+                    const savedPortal = sessionStorage.getItem('ava_active_portal_role') || localStorage.getItem('ava_active_portal_role');
+                    const activePortalRole = (view === 'buyer' || view === 'seller') 
+                        ? getRoleString(view) 
+                        : (savedPortal || 'user');
+
+                    let userRole = activePortalRole;
                     let fullName = user.displayName || 'User';
                     let details = {};
+                    let location = 'Karnataka, India';
                     
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
-                        userRole = userData.role || 'user';
-                        fullName = userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : fullName;
+                        if (view !== 'buyer' && view !== 'seller') {
+                            userRole = savedPortal || userData.lastActiveRole || userData.role || 'user';
+                        }
+                        fullName = userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : (userData.fullName || fullName);
                         details = userData.details || {};
+                        location = userData.location || location;
                     }
 
-                    setStatusMessage({ type: 'success', text: 'Login successful! Redirecting...' });
+                    setStatusMessage({ type: 'success', text: isKannada ? 'ದೃಢೀಕರಿಸಲಾಗಿದೆ. ಮರುನಿರ್ದೇಶಿಸಲಾಗುತ್ತಿದೆ...' : 'Authenticated successfully. Redirecting...' });
 
                     setTimeout(() => {
                         onLoginSuccess({
@@ -73,149 +117,131 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                             email: user.email || '',
                             role: mapRoleToUserRole(userRole),
                             fullName: fullName,
-                            location: 'Karnataka, India',
+                            location: location,
                             details: details
                         });
-                    }, 1000);
+                    }, 400);
                 } catch (err) {
-                    console.error("Error fetching user role:", err);
+                    console.error("Error fetching user profile:", err);
                 }
             }
         });
 
-        return () => {
-            unsubscribe();
-        };
-    }, [view]);
+        return () => unsubscribe();
+    }, [view, isKannada]);
 
-    const handleRoleSelect = (role: ViewState) => {
-        setView(role);
-    };
-
-    const handleBackToHome = () => {
-        setView('role-selection');
-    };
-
-    const getRoleString = (view: ViewState): string => {
-        switch (view) {
-            case 'buyer': return 'buyer';
-            case 'seller': return 'seller';
-            case 'admin': return 'admin';
-            default: return 'user';
-        }
-    };
-
-    const mapRoleToUserRole = (roleString: string): UserRole => {
-        switch (roleString) {
-            case 'buyer': return UserRole.BUYER;
-            case 'seller': return UserRole.USER;
-            case 'admin': return UserRole.ADMIN;
-            default: return UserRole.USER;
-        }
-    };
-
+    // Standard Sign In (Accepts either Email or Mobile Number + Password)
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setStatusMessage(null);
 
+        const currentPortalRole = getRoleString(view);
+        sessionStorage.setItem('ava_active_portal_role', currentPortalRole);
+        localStorage.setItem('ava_active_portal_role', currentPortalRole);
+
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            let targetEmail = identifier.trim();
+
+            // If user entered a 10-digit mobile number, resolve it to their registered email
+            const cleanDigits = targetEmail.replace(/\D/g, '');
+            if (cleanDigits.length === 10 && !targetEmail.includes('@')) {
+                const usersRef = collection(db, 'users');
+                const q = query(usersRef, where('phone', '==', cleanDigits));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    targetEmail = snap.docs[0].data().email || targetEmail;
+                } else {
+                    targetEmail = `${cleanDigits}@phone.agriverse.ai`;
+                }
+            }
+
+            const userCredential = await signInWithEmailAndPassword(auth, targetEmail, password);
             const user = userCredential.user;
 
             if (user) {
-                setStatusMessage({ type: 'success', text: 'Login successful! Redirecting...' });
-
-                const currentPortalRole = getRoleString(view);
                 const userDocRef = doc(db, 'users', user.uid);
                 const userDoc = await getDoc(userDocRef);
                 
-                let userData = userDoc.exists() ? userDoc.data() : null;
-                
-                if (!userData) {
-                    if (currentPortalRole === 'admin') {
-                        await auth.signOut();
-                        throw new Error("Access denied. Admin accounts cannot be created this way.");
-                    }
-                    userData = { role: currentPortalRole, first_name: '', last_name: '', details: {} };
-                    await setDoc(userDocRef, userData);
-                }
-
-                const storedRole = userData.role;
-
-                if (storedRole !== currentPortalRole) {
-                    await auth.signOut();
-                    throw new Error(`Invalid portal. Please login via the ${storedRole.charAt(0).toUpperCase() + storedRole.slice(1)} portal.`);
-                }
-
-                const fullName = userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : (user.displayName || 'User');
-
-                setTimeout(() => {
-                    onLoginSuccess({
-                        id: user.uid,
-                        email: user.email || email,
-                        role: mapRoleToUserRole(storedRole), // Use the stored role, not the portal role
-                        fullName: fullName,
+                if (!userDoc.exists()) {
+                    await setDoc(userDocRef, {
+                        email: user.email,
+                        role: currentPortalRole,
+                        lastActiveRole: currentPortalRole,
+                        first_name: '',
+                        last_name: '',
                         location: 'Karnataka, India',
-                        details: userData.details || {}
+                        details: {}
                     });
-                }, 1000);
+                } else {
+                    await setDoc(userDocRef, {
+                        lastActiveRole: currentPortalRole
+                    }, { merge: true });
+                }
+
+                setStatusMessage({ type: 'success', text: isKannada ? 'ಸೈನ್ ಇನ್ ಯಶಸ್ವಿಯಾಗಿದೆ! ಮರುನಿರ್ದೇಶಿಸಲಾಗುತ್ತಿದೆ...' : 'Login successful! Redirecting...' });
             }
         } catch (error: any) {
             console.error('Login error:', error);
-            setStatusMessage({ type: 'error', text: error.message || 'Failed to login' });
+            setStatusMessage({ type: 'error', text: t.invalidCredentials });
             setIsLoading(false);
         }
     };
 
+    // Standard Registration (First Name, Last Name, Phone, Email, Password)
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setStatusMessage(null);
 
+        const currentPortalRole = getRoleString(view);
+        sessionStorage.setItem('ava_active_portal_role', currentPortalRole);
+        localStorage.setItem('ava_active_portal_role', currentPortalRole);
+
+        const cleanPhone = phoneNumber.replace(/\D/g, '');
+        if (cleanPhone && cleanPhone.length !== 10) {
+            setStatusMessage({ type: 'error', text: t.validPhoneError });
+            setIsLoading(false);
+            return;
+        }
+
         try {
-            const role = getRoleString(view);
-            if (role === 'admin') {
-                throw new Error("Admins cannot be created via public signup.");
-            }
-            
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
             const user = userCredential.user;
 
             if (user) {
-                // Store user metadata in Firestore
                 await setDoc(doc(db, 'users', user.uid), {
                     email: user.email,
-                    first_name: firstName,
-                    middle_name: middleName,
-                    last_name: lastName,
-                    role: role,
+                    phone: cleanPhone || '',
+                    first_name: firstName.trim(),
+                    last_name: lastName.trim(),
+                    role: currentPortalRole,
+                    lastActiveRole: currentPortalRole,
+                    location: 'Karnataka, India',
+                    createdAt: new Date().toISOString(),
                     details: {}
                 });
 
-                setStatusMessage({ type: 'success', text: 'Account created! Redirecting...' });
-                setTimeout(() => {
-                    onLoginSuccess({
-                        id: user.uid,
-                        email: user.email || email,
-                        role: mapRoleToUserRole(role),
-                        fullName: `${firstName} ${lastName}`,
-                        location: 'Karnataka, India',
-                        details: {}
-                    });
-                }, 1000);
+                setStatusMessage({ type: 'success', text: isKannada ? 'ಖಾತೆ ನೋಂದಾಯಿಸಲಾಗಿದೆ! ಪ್ರವೇಶಿಸಲಾಗುತ್ತಿದೆ...' : 'Account registered! Entering dashboard...' });
             }
         } catch (error: any) {
             console.error('Signup error:', error);
-            setStatusMessage({ type: 'error', text: error.message || 'Failed to sign up' });
+            if (error.code === 'auth/email-already-in-use') {
+                setStatusMessage({ type: 'error', text: t.emailInUseError });
+            } else {
+                setStatusMessage({ type: 'error', text: error.message || 'Failed to create account.' });
+            }
             setIsLoading(false);
         }
     };
 
+    // Google 1-Click Sign-In
     const handleGoogleLogin = async () => {
-        setStatusMessage({ type: 'success', text: 'Opening Google Login...' });
+        const currentRole = getRoleString(view);
+        sessionStorage.setItem('ava_active_portal_role', currentRole);
+        localStorage.setItem('ava_active_portal_role', currentRole);
+        setStatusMessage({ type: 'success', text: isKannada ? 'ಗೂಗಲ್ ಸಂಪರ್ಕಿಸಲಾಗುತ್ತಿದೆ...' : 'Connecting to Google...' });
         try {
-            const currentRole = getRoleString(view);
             const provider = new GoogleAuthProvider();
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
@@ -225,31 +251,28 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 const userDoc = await getDoc(userDocRef);
                 
                 if (!userDoc.exists()) {
-                     if (currentRole === 'admin') {
-                         await auth.signOut();
-                         throw new Error("Admins cannot sign up via Google Login.");
-                     }
                      await setDoc(userDocRef, {
                          email: user.email,
                          role: currentRole,
+                         lastActiveRole: currentRole,
                          first_name: user.displayName?.split(' ')[0] || '',
                          last_name: user.displayName?.split(' ').slice(1).join(' ') || '',
+                         location: 'Karnataka, India',
+                         createdAt: new Date().toISOString(),
                          details: {}
                      });
                 } else {
-                     const storedRole = userDoc.data().role;
-                     if (storedRole !== currentRole) {
-                         await auth.signOut();
-                         throw new Error(`Invalid portal. Please login via the ${storedRole.charAt(0).toUpperCase() + storedRole.slice(1)} portal.`);
-                     }
+                    await setDoc(userDocRef, {
+                        lastActiveRole: currentRole
+                    }, { merge: true });
                 }
             }
         } catch (error: any) {
-            setStatusMessage({ type: 'error', text: error.message });
+            setStatusMessage({ type: 'error', text: error.message || 'Google sign-in was cancelled or failed.' });
         }
     };
 
-    // Render Landing Page
+    // View 1: Public Landing Page
     if (view === 'intro') {
         return (
             <LandingPage
@@ -270,266 +293,403 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         );
     }
 
-    // Render Role Selection (Matches Login_sys/index.html)
+    // View 2: Monochrome Role Selection
     if (view === 'role-selection') {
         return (
-            <div className="login-system-root role-selection-mode">
-                <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10 }}>
-                    <LanguageToggle currentLanguage={currentLanguage} setCurrentLanguage={setCurrentLanguage} />
-                </div>
+            <div className="min-h-screen bg-black text-white flex flex-col justify-between p-4 sm:p-8 lg:p-12 relative overflow-hidden font-sans selection:bg-white selection:text-black">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-neutral-900/40 rounded-full blur-[140px] pointer-events-none" />
 
-                <motion.p
-                    className="welcome-text"
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
-                >
-                    {texts.welcome_to || 'Welcome to'}
-                </motion.p>
+                <header className="w-full flex justify-between items-center relative z-20">
+                    <button 
+                        onClick={() => setView('intro')}
+                        className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 hover:text-white transition-colors bg-neutral-950 border border-neutral-800 px-3.5 py-2 rounded-lg"
+                    >
+                        <ArrowLeftIcon className="w-3.5 h-3.5" />
+                        <span>{t.backToHome}</span>
+                    </button>
 
-                <motion.div
-                    className="role-container"
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.2, duration: 0.5 }}
-                >
-                    <h1>AGRIVERSE AI</h1>
-                    <p>{texts.select_role || 'Select your role to continue'}</p>
-                    <div className="role-options">
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono font-bold tracking-widest text-neutral-500 uppercase hidden sm:inline">
+                            AGRIVERSE AI
+                        </span>
+                        <LanguageToggle currentLanguage={currentLanguage} setCurrentLanguage={setCurrentLanguage} size="sm" />
+                    </div>
+                </header>
+
+                <main className="w-full max-w-5xl mx-auto my-auto py-10 relative z-20 flex flex-col items-center">
+                    <div className="text-center max-w-2xl mb-12">
+                        <div className="inline-block px-3 py-1 bg-neutral-900 border border-neutral-800 rounded-full text-[11px] font-mono uppercase tracking-widest text-neutral-400 mb-4">
+                            {t.portalAccess}
+                        </div>
+                        <h1 className="text-3xl sm:text-5xl font-black uppercase tracking-tight text-white mb-3">
+                            {t.selectYourRole}
+                        </h1>
+                        <p className="text-neutral-400 text-sm sm:text-base leading-relaxed">
+                            {t.selectRoleDesc}
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                        {/* Farmer Card */}
                         <motion.div
-                            className="role-btn"
-                            onClick={() => handleRoleSelect('buyer')}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            <BuildingIcon />
-                            <span>{texts.buyer || 'Buyer (Market Agent)'}</span>
-                        </motion.div>
-
-                        <motion.div
-                            className="role-btn"
+                            whileHover={{ y: -4 }}
                             onClick={() => handleRoleSelect('seller')}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                            className="group relative bg-neutral-950 border border-neutral-800 hover:border-white rounded-2xl p-6 sm:p-8 cursor-pointer transition-all duration-300 flex flex-col justify-between shadow-2xl hover:shadow-white/5"
                         >
-                            <UserCircleIcon />
-                            <span>{texts.seller || 'Seller'}</span>
+                            <div>
+                                <div className="flex justify-between items-start mb-6">
+                                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded bg-neutral-900 text-neutral-300 border border-neutral-800 group-hover:border-neutral-700">
+                                        {t.producerTag}
+                                    </span>
+                                    <span className="text-xs font-mono text-neutral-500 group-hover:text-white transition-colors">
+                                        #01
+                                    </span>
+                                </div>
+
+                                <h2 className="text-2xl sm:text-3xl font-bold uppercase tracking-tight text-white mb-2">
+                                    {t.farmerCultivator}
+                                </h2>
+                                <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed mb-6 font-mono">
+                                    {t.farmerCardDesc}
+                                </p>
+
+                                <div className="space-y-2.5 pt-4 border-t border-neutral-900 text-xs text-neutral-300">
+                                    <div className="flex items-center gap-2">
+                                        <CheckIcon className="w-4 h-4 text-white shrink-0" />
+                                        <span>{t.farmerFeature1}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <CheckIcon className="w-4 h-4 text-white shrink-0" />
+                                        <span>{t.farmerFeature2}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <CheckIcon className="w-4 h-4 text-white shrink-0" />
+                                        <span>{t.farmerFeature3}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <CheckIcon className="w-4 h-4 text-white shrink-0" />
+                                        <span>{t.farmerFeature4}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-8 pt-4">
+                                <div className="w-full bg-white text-black group-hover:bg-neutral-200 font-mono font-bold text-xs uppercase tracking-wider py-3.5 px-4 rounded-xl flex items-center justify-between transition-all">
+                                    <span>{t.enterFarmerPortal}</span>
+                                    <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                                </div>
+                            </div>
                         </motion.div>
 
+                        {/* Buyer Card */}
                         <motion.div
-                            className="role-btn"
-                            onClick={() => handleRoleSelect('admin')}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                            whileHover={{ y: -4 }}
+                            onClick={() => handleRoleSelect('buyer')}
+                            className="group relative bg-neutral-950 border border-neutral-800 hover:border-white rounded-2xl p-6 sm:p-8 cursor-pointer transition-all duration-300 flex flex-col justify-between shadow-2xl hover:shadow-white/5"
                         >
-                            <ShieldCheckIcon />
-                            <span>{texts.admin || 'Admin'}</span>
+                            <div>
+                                <div className="flex justify-between items-start mb-6">
+                                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded bg-neutral-900 text-neutral-300 border border-neutral-800 group-hover:border-neutral-700">
+                                        {t.buyerTag}
+                                    </span>
+                                    <span className="text-xs font-mono text-neutral-500 group-hover:text-white transition-colors">
+                                        #02
+                                    </span>
+                                </div>
+
+                                <h2 className="text-2xl sm:text-3xl font-bold uppercase tracking-tight text-white mb-2">
+                                    {t.buyerTrader}
+                                </h2>
+                                <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed mb-6 font-mono">
+                                    {t.buyerCardDesc}
+                                </p>
+
+                                <div className="space-y-2.5 pt-4 border-t border-neutral-900 text-xs text-neutral-300">
+                                    <div className="flex items-center gap-2">
+                                        <CheckIcon className="w-4 h-4 text-white shrink-0" />
+                                        <span>{t.buyerFeature1}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <CheckIcon className="w-4 h-4 text-white shrink-0" />
+                                        <span>{t.buyerFeature2}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <CheckIcon className="w-4 h-4 text-white shrink-0" />
+                                        <span>{t.buyerFeature3}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <CheckIcon className="w-4 h-4 text-white shrink-0" />
+                                        <span>{t.buyerFeature4}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-8 pt-4">
+                                <div className="w-full bg-white text-black group-hover:bg-neutral-200 font-mono font-bold text-xs uppercase tracking-wider py-3.5 px-4 rounded-xl flex items-center justify-between transition-all">
+                                    <span>{t.enterBuyerPortal}</span>
+                                    <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                                </div>
+                            </div>
                         </motion.div>
                     </div>
-                </motion.div>
+                </main>
             </div>
         );
     }
 
-    // Render Auth Form (Matches Login_sys/buyer.html, seller.html, admin-login.html)
+    // View 3: Clean, Professional Monochrome Auth Form (Sign In / Register)
     const isBuyer = view === 'buyer';
-    const isSeller = view === 'seller';
-    const isAdmin = view === 'admin';
-
-    const themeClass = isBuyer ? 'buyer-theme' : isSeller ? 'seller-theme' : 'admin-theme';
-    const title = isBuyer ? (texts.buyer_portal || 'Buyer Portal') : isSeller ? (texts.seller_portal || 'Seller Portal') : (texts.admin_portal || 'Admin Portal');
-    const subtitle = isBuyer ? (texts.buyer_subtitle || 'Access your Market Agent dashboard') : isSeller ? (texts.seller_subtitle || 'Access your seller dashboard') : (texts.admin_subtitle || 'Secure access to administrative controls');
-    const Icon = isBuyer ? BuildingIcon : isSeller ? UserCircleIcon : ShieldCheckIcon;
+    const roleTitle = isBuyer ? t.buyerTrader : t.farmerCultivator;
+    const roleBadge = isBuyer ? t.buyerPortalBadge : t.farmerPortalBadge;
 
     return (
-        <div className={`login-system-root portal-mode ${themeClass}`}>
-            <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10 }}>
-                <LanguageToggle currentLanguage={currentLanguage} setCurrentLanguage={setCurrentLanguage} />
-            </div>
+        <div className="min-h-screen bg-black text-white flex flex-col justify-between p-4 sm:p-8 lg:p-12 relative overflow-hidden font-sans selection:bg-white selection:text-black">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-neutral-900/30 rounded-full blur-[130px] pointer-events-none" />
 
-            <button className="back-btn" onClick={handleBackToHome} aria-label="Go back to home">
-                <ArrowLeftIcon className="w-6 h-6" />
-            </button>
+            <header className="w-full flex justify-between items-center relative z-20">
+                <button 
+                    onClick={() => setView('role-selection')}
+                    className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400 hover:text-white transition-colors bg-neutral-950 border border-neutral-800 px-3.5 py-2 rounded-lg"
+                >
+                    <ArrowLeftIcon className="w-3.5 h-3.5" />
+                    <span>{t.switchRole}</span>
+                </button>
 
-            <motion.div
-                className="auth-container"
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-            >
-                <div className="header">
-                    <div className="logo text-white">
-                        <Icon className="w-8 h-8" />
-                    </div>
-                    <h1>{title}</h1>
-                    <p className="subtitle">{subtitle}</p>
+                <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono font-bold tracking-widest text-neutral-500 uppercase hidden sm:inline">
+                        AGRIVERSE AI
+                    </span>
+                    <LanguageToggle currentLanguage={currentLanguage} setCurrentLanguage={setCurrentLanguage} size="sm" />
                 </div>
+            </header>
 
-                {!isAdmin && (
-                    <div className="tabs">
-                        <div
-                            className={`tab ${authMode === 'login' ? 'active' : ''}`}
-                            onClick={() => setAuthMode('login')}
-                        >
-                            {texts.sign_in || 'Sign In'}
+            <main className="w-full max-w-md mx-auto my-auto py-8 relative z-20">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 sm:p-8 shadow-2xl"
+                >
+                    {/* Role Header */}
+                    <div className="text-center mb-6">
+                        <div className="inline-block px-2.5 py-1 bg-neutral-900 border border-neutral-800 rounded text-[10px] font-mono uppercase tracking-widest text-neutral-300 mb-3">
+                            {roleBadge}
                         </div>
-                        <div
-                            className={`tab ${authMode === 'signup' ? 'active' : ''}`}
-                            onClick={() => setAuthMode('signup')}
-                        >
-                            {texts.create_account || 'Create Account'}
-                        </div>
+                        <h2 className="text-2xl font-bold uppercase tracking-tight text-white">
+                            {authMode === 'login' ? t.signIn : t.register}
+                        </h2>
+                        <p className="text-xs text-neutral-400 font-mono mt-1">
+                            {t.accessingAs} {roleTitle}
+                        </p>
                     </div>
-                )}
 
-                <AnimatePresence mode="wait">
-                    {authMode === 'login' || isAdmin ? (
-                        <motion.form
-                            key="login-form"
-                            onSubmit={handleLogin}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            transition={{ duration: 0.3 }}
+                    {/* Clean Professional Segmented Switcher: [ SIGN IN ] | [ REGISTER ] */}
+                    <div className="bg-neutral-900 p-1 rounded-xl border border-neutral-800 flex mb-6">
+                        <button
+                            type="button"
+                            onClick={() => { setAuthMode('login'); setStatusMessage(null); }}
+                            className={`flex-1 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all ${
+                                authMode === 'login' 
+                                    ? 'bg-white text-black shadow-md' 
+                                    : 'text-neutral-400 hover:text-white'
+                            }`}
                         >
-                            <div className="form-group">
-                                <label className="form-label">{texts.email_address || 'Email Address'}</label>
-                                <input
-                                    type="email"
-                                    placeholder="Enter your email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">{texts.password || 'Password'}</label>
-                                <input
-                                    type="password"
-                                    placeholder="Enter your password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                />
-                            </div>
-
-                            <button className="btn" type="submit" disabled={isLoading}>
-                                {isLoading ? <span className="loading"></span> : (texts.sign_in || 'Sign In')}
-                            </button>
-                        </motion.form>
-                    ) : (
-                        <motion.form
-                            key="signup-form"
-                            onSubmit={handleSignup}
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.3 }}
+                            {t.signIn}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setAuthMode('signup'); setStatusMessage(null); }}
+                            className={`flex-1 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all ${
+                                authMode === 'signup' 
+                                    ? 'bg-white text-black shadow-md' 
+                                    : 'text-neutral-400 hover:text-white'
+                            }`}
                         >
-                            <div className="name-grid">
-                                <div className="form-group">
-                                    <label className="form-label">{texts.first_name || 'First Name'}</label>
-                                    <input
-                                        type="text"
-                                        placeholder="First name"
-                                        value={firstName}
-                                        onChange={(e) => setFirstName(e.target.value)}
-                                        required
-                                        minLength={1}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">{texts.middle_name || 'Middle Name'}</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Optional"
-                                        value={middleName}
-                                        onChange={(e) => setMiddleName(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{texts.last_name || 'Last Name'}</label>
+                            {t.register}
+                        </button>
+                    </div>
+
+                    {/* Google 1-Click Sign-In */}
+                    <button
+                        type="button"
+                        onClick={handleGoogleLogin}
+                        className="w-full bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700 hover:border-neutral-600 font-mono text-xs font-bold uppercase tracking-wider py-3 rounded-xl flex items-center justify-center gap-2.5 transition-all mb-6"
+                    >
+                        <GoogleIcon className="w-4 h-4" />
+                        <span>{t.continueWithGoogle}</span>
+                    </button>
+
+                    <div className="relative flex items-center justify-center mb-6">
+                        <div className="border-t border-neutral-800 w-full" />
+                        <span className="bg-neutral-950 px-3 text-[10px] font-mono uppercase tracking-widest text-neutral-500 absolute">
+                            {t.orWithCredentials}
+                        </span>
+                    </div>
+
+                    {/* 1. Sign In Form (Email or Mobile + Password) */}
+                    {authMode === 'login' ? (
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <div>
+                                <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1.5">
+                                    {t.emailOrMobile}
+                                </label>
                                 <input
                                     type="text"
-                                    placeholder="Last name"
-                                    value={lastName}
-                                    onChange={(e) => setLastName(e.target.value)}
                                     required
-                                    minLength={1}
+                                    placeholder="farmer@agriverse.ai or 9876543210"
+                                    value={identifier}
+                                    onChange={(e) => setIdentifier(e.target.value)}
+                                    className="w-full bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-white transition-all placeholder:text-neutral-600"
                                 />
                             </div>
 
-                            <div className="form-group">
-                                <label className="form-label">{texts.email_address || 'Email Address'}</label>
-                                <input
-                                    type="email"
-                                    placeholder="Enter your email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">{texts.password || 'Password'}</label>
+                            <div>
+                                <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1.5">
+                                    {t.passwordLabel}
+                                </label>
                                 <input
                                     type="password"
-                                    placeholder="Create a password (min 6 chars)"
+                                    required
+                                    placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    minLength={6}
+                                    className="w-full bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-white transition-all placeholder:text-neutral-600"
                                 />
                             </div>
 
-                            <button className="btn" type="submit" disabled={isLoading}>
-                                {isLoading ? <span className="loading"></span> : (texts.create_account || 'Create Account')}
+                            {statusMessage && (
+                                <div className={`p-3 rounded-xl text-xs font-mono ${
+                                    statusMessage.type === 'success'
+                                        ? 'bg-neutral-900 text-white border border-neutral-700'
+                                        : 'bg-red-950/40 text-red-300 border border-red-800'
+                                }`}>
+                                    {statusMessage.text}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full bg-white text-black hover:bg-neutral-200 font-mono font-bold text-xs uppercase tracking-wider py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-4 disabled:opacity-50 cursor-pointer"
+                            >
+                                {isLoading ? (
+                                    <span className="inline-block animate-spin border-2 border-black border-t-transparent rounded-full w-4 h-4" />
+                                ) : (
+                                    <>
+                                        <span>{t.signInBtn}</span>
+                                        <ArrowRightIcon className="w-4 h-4" />
+                                    </>
+                                )}
                             </button>
-                        </motion.form>
+                        </form>
+                    ) : (
+                        /* 2. Registration Form */
+                        <form onSubmit={handleSignup} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1.5">
+                                        {t.firstNameLabel}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="Basavaraj"
+                                        value={firstName}
+                                        onChange={(e) => setFirstName(e.target.value)}
+                                        className="w-full bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-white transition-all placeholder:text-neutral-600"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1.5">
+                                        {t.lastNameLabel}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="Patil"
+                                        value={lastName}
+                                        onChange={(e) => setLastName(e.target.value)}
+                                        className="w-full bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-white transition-all placeholder:text-neutral-600"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1.5">
+                                    {t.mobileLabel}
+                                </label>
+                                <div className="flex gap-2">
+                                    <span className="bg-neutral-900 border border-neutral-800 text-neutral-400 font-mono text-xs px-3 py-2.5 rounded-xl flex items-center shrink-0">
+                                        +91
+                                    </span>
+                                    <input
+                                        type="tel"
+                                        maxLength={10}
+                                        placeholder="9876543210"
+                                        value={phoneNumber}
+                                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                                        className="w-full bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-white transition-all placeholder:text-neutral-600"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1.5">
+                                    {t.emailLabel}
+                                </label>
+                                <input
+                                    type="email"
+                                    required
+                                    placeholder="farmer@agriverse.ai"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-white transition-all placeholder:text-neutral-600"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1.5">
+                                    {t.passwordLabel}
+                                </label>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={6}
+                                    placeholder={t.createPasswordPlaceholder}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-white transition-all placeholder:text-neutral-600"
+                                />
+                            </div>
+
+                            {statusMessage && (
+                                <div className={`p-3 rounded-xl text-xs font-mono ${
+                                    statusMessage.type === 'success'
+                                        ? 'bg-neutral-900 text-white border border-neutral-700'
+                                        : 'bg-red-950/40 text-red-300 border border-red-800'
+                                }`}>
+                                    {statusMessage.text}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full bg-white text-black hover:bg-neutral-200 font-mono font-bold text-xs uppercase tracking-wider py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-4 disabled:opacity-50 cursor-pointer"
+                            >
+                                {isLoading ? (
+                                    <span className="inline-block animate-spin border-2 border-black border-t-transparent rounded-full w-4 h-4" />
+                                ) : (
+                                    <>
+                                        <span>{t.registerBtn}</span>
+                                        <ArrowRightIcon className="w-4 h-4" />
+                                    </>
+                                )}
+                            </button>
+                        </form>
                     )}
-                </AnimatePresence>
-
-                {authMode === 'signup' && !isAdmin && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.2 }}
-                    >
-                        <div style={{ textAlign: 'center', margin: '20px 0', position: 'relative' }}>
-                            <hr style={{ border: 0, borderTop: '1px solid var(--border)' }} />
-                            <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-primary)', padding: '0 10px', color: 'var(--text-secondary)', fontSize: '14px' }}>OR</span>
-                        </div>
-
-                        <button
-                            className="btn google-btn"
-                            type="button"
-                            onClick={handleGoogleLogin}
-                        >
-                            <GoogleIcon className="w-5 h-5" />
-                            <span>Sign up with Google</span>
-                        </button>
-                    </motion.div>
-                )}
-
-                {statusMessage && (
-                    <motion.div
-                        className={`status ${statusMessage.type}`}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                    >
-                        {statusMessage.text}
-                    </motion.div>
-                )}
-
-                <div className="back-to-home">
-                    <button onClick={handleBackToHome}>
-                        <ArrowLeftIcon className="w-4 h-4" />
-                        <span>{texts.back_to_home || 'Back to Home'}</span>
-                    </button>
-                </div>
-            </motion.div>
+                </motion.div>
+            </main>
         </div>
     );
 };

@@ -2,8 +2,8 @@
 
 import { Language, UIStrings, ExampleCategory, HistoricalDataPoint } from './types';
 
-export const GEMINI_MODEL_TEXT = 'gemini-1.5-flash';
-export const GEMINI_MODEL_VISION = 'gemini-1.5-flash';
+export const GEMINI_MODEL_TEXT = 'gemini-2.5-flash';
+export const GEMINI_MODEL_VISION = 'gemini-2.5-flash';
 
 export const karnatakaDistricts = [
     { name: 'Bagalkote', lat: 16.18, lon: 75.7 },
@@ -383,6 +383,76 @@ const knStrings = {
     ],
     listening: "ಮುಂದುವರಿಸಿ, ನಾನು ಕೇಳುತ್ತಿದ್ದೇನೆ",
 
+    // Weather
+    weatherTitle: "ಹವಾಮಾನ ಮಾಹಿತಿ",
+    selectDistrict: "ಜಿಲ್ಲೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    loadingWeather: "ಹವಾಮಾನ ಮಾಹಿತಿ ಪಡೆಯಲಾಗುತ್ತಿದೆ...",
+    weatherStatus: "ಸ್ಥಿತಿ",
+    weather_high: "ಗರಿಷ್ಠ",
+    weather_low: "ಕನಿಷ್ಠ",
+    days: ["ಭಾನುವಾರ", "ಸೋಮವಾರ", "ಮಂಗಳವಾರ", "ಬುಧವಾರ", "ಗುರುವಾರ", "ಶುಕ್ರವಾರ", "ಶನಿವಾರ"],
+    today: "ಇಂದು",
+    weatherCodes: {
+        0: "ಸ್ವಚ್ಛ ಆಕಾಶ", 1: "ಹೆಚ್ಚಾಗಿ ಸ್ವಚ್ಛ", 2: "ಭಾಗಶಃ ಮೋಡ", 3: "ಮೋಡ ಕವಿದ ವಾತಾವರಣ",
+        45: "ದಟ್ಟ ಮಂಜು", 48: "ಹಿಮ ಮಂಜು",
+        51: "ತಿಳಿ ತುಂತುರು ಮಳೆ", 53: "ಮಧ್ಯಮ ತುಂತುರು ಮಳೆ", 55: "ದಟ್ಟ ತುಂತುರು ಮಳೆ",
+        56: "ತಣ್ಣನೆಯ ತುಂತುರು ಮಳೆ", 57: "ದಟ್ಟ ತಣ್ಣನೆಯ ತುಂತುರು ಮಳೆ",
+        61: "ಸಾಧಾರಣ ಮಳೆ", 63: "ಮಧ್ಯಮ ಮಳೆ", 65: "ಭಾರಿ ಮಳೆ",
+        66: "ತಣ್ಣನೆಯ ಸಾಧಾರಣ ಮಳೆ", 67: "ತಣ್ಣನೆಯ ಭಾರಿ ಮಳೆ",
+        71: "ಸಾಧಾರಣ ಹಿಮಪಾತ", 73: "ಮಧ್ಯಮ ಹಿಮಪಾತ", 75: "ಭಾರಿ ಹಿಮಪಾತ",
+        77: "ಹಿಮದ ಹರಳುಗಳು",
+        80: "ಸಾಧಾರಣ ಮಳೆ ಸುರಿತ", 81: "ಮಧ್ಯಮ ಮಳೆ ಸುರಿತ", 82: "ಭಾರಿ ಮಳೆ ಸುರಿತ",
+        85: "ಸಾಧಾರಣ ಹಿಮ ಸುರಿತ", 86: "ಭಾರಿ ಹಿಮ ಸುರಿತ",
+        95: "ಗುಡುಗು ಸಹಿತ ಮಳೆ", 96: "ಗುಡುಗು ಮತ್ತು ಸಾಧಾರಣ ಆಲಿಕಲ್ಲು ಮಳೆ", 99: "ಗುಡುಗು ಮತ್ತು ಭಾರಿ ಆಲಿಕಲ್ಲು ಮಳೆ"
+    },
+    hourlyForecast: "ಗಂಟೆಯ ಮುನ್ಸೂಚನೆ",
+    dailyForecast: "೭ ದಿನಗಳ ಮುನ್ಸೂಚನೆ",
+    airQuality: "ವಾಯು ಗುಣಮಟ್ಟ",
+    airQualityIndex: "ಎಕ್ಯೂಐ (AQI)",
+    uvIndex: "ಯುವಿ ಸೂಚ್ಯಂಕ",
+    sunrise: "ಸೂರ್ಯೋದಯ",
+    sunset: "ಸೂರ್ಯಾಸ್ತ",
+    wind: "ಗಾಳಿ",
+    humidity: "ತೇವಾಂಶ",
+    feelsLike: "ಅನುಭವವಾಗುವ ತಾಪಮಾನ",
+    precipitation: "ಮಳೆ ಪ್ರಮಾಣ",
+    aqi_good: "ಉತ್ತಮ",
+    aqi_moderate: "ಮಧ್ಯಮ",
+    aqi_unhealthy_sensitive: "ಸೂಕ್ಷ್ಮ ಜನರಿಗೆ ಅನಾರೋಗ್ಯಕರ",
+    aqi_unhealthy: "ಅನಾರೋಗ್ಯಕರ",
+    aqi_very_unhealthy: "ಅತ್ಯಂತ ಅನಾರೋಗ್ಯಕರ",
+    aqi_hazardous: "ಅಪಾಯಕಾರಿ",
+    aqi_good_desc: "ವಾಯು ಗುಣಮಟ್ಟವು ತೃಪ್ತಿಕರವಾಗಿದೆ, ಯಾವುದೇ ಅಪಾಯವಿಲ್ಲ.",
+    aqi_moderate_desc: "ವಾಯು ಮಾಲಿನ್ಯವು ಬಹುಪಾಲು ಜನರಿಗೆ ಸ್ವೀಕಾರಾರ್ಹವಾಗಿದೆ.",
+    aqi_unhealthy_sensitive_desc: "ಸೂಕ್ಷ್ಮ ಜನರಿಗೆ ಆರೋಗ್ಯದ ಮೇಲೆ ಪರಿಣಾಮ ಬೀರಬಹುದು.",
+    aqi_unhealthy_desc: "ಎಲ್ಲರಿಗೂ ಆರೋಗ್ಯದ ಮೇಲೆ ಪರಿಣಾಮ ಬೀರಲು ಪ್ರಾರಂಭವಾಗಬಹುದು.",
+    aqi_very_unhealthy_desc: "ಆರೋಗ್ಯ ಎಚ್ಚರಿಕೆ: ಪ್ರತಿಯೊಬ್ಬರೂ ಗಂಭೀರ ಆರೋಗ್ಯ ಸಮಸ್ಯೆಗಳನ್ನು ಎದುರಿಸಬಹುದು.",
+    aqi_hazardous_desc: "ತುರ್ತು ಪರಿಸ್ಥಿತಿಯ ಆರೋಗ್ಯ ಎಚ್ಚರಿಕೆ. ಇಡೀ ಜನಸಂಖ್ಯೆಯ ಮೇಲೆ ಪರಿಣಾಮ ಬೀರುತ್ತದೆ.",
+
+    // Soil Analysis
+    soilAnalysisTitle: "ನೈಜ-ಸಮಯದ ಮಣ್ಣಿನ ವಿಶ್ಲೇಷಣೆ ಮತ್ತು ಬೆಳೆ ಊಹೆ",
+    soilAnalysisDescription: "ನಿಮ್ಮ ಮಣ್ಣು ಮತ್ತು ಹವಾಮಾನ ಪರಿಸ್ಥಿತಿಗಳಿಗೆ ಹೊಂದಿಸಲು ಸ್ಲೈಡರ್‌ಗಳನ್ನು ಸರಿಹೊಂದಿಸಿ, ನಂತರ ನಮ್ಮ AI ತಜ್ಞರ ಶಿಫಾರಸುಗಳನ್ನು ಪಡೆಯಿರಿ.",
+    soilAnalysisButton: "ವಿಶ್ಲೇಷಿಸಿ ಮತ್ತು ಬೆಳೆಗಳನ್ನು ಊಹಿಸಿ",
+    soilParamTitle: "ಮಣ್ಣು ಮತ್ತು ಹವಾಮಾನ ನಿಯತಾಂಕಗಳು",
+    locationTitle: "ಸ್ಥಳ",
+    selectTaluk: "ತಾಲೂಕನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    selectVillage: "ಗ್ರಾಮ/ಪ್ರದೇಶವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    soilHealthSummary: "ಮಣ್ಣಿನ ಆರೋಗ್ಯ ಸಾರಾಂಶ",
+    nutrientAnalysis: "ಪೋಷಕಾಂಶಗಳ ವಿಶ್ಲೇಷಣೆ",
+    cropRecommendations: "ಪ್ರಮುಖ ಬೆಳೆ ಶಿಫಾರಸುಗಳು",
+    suitability: "ಸೂಕ್ತತೆ",
+    plantingTips: "ಬಿತ್ತನೆ ಸಲಹೆಗಳು",
+    nitrogen: "ಸಾರಜನಕ (N)",
+    phosphorus: "ರಂಜಕ (P)",
+    potassium: "ಪೊಟ್ಯಾಶ್ (K)",
+    ph: "ಪಿಎಚ್ ಮಟ್ಟ (pH)",
+    temperature: "ತಾಪಮಾನ",
+    rainfall: "ಮಳೆ ಪ್ರಮಾಣ",
+    loadingAnalysis: "ನಿಮ್ಮ ಮಣ್ಣನ್ನು ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ... ಸ್ವಲ್ಪ ಸಮಯ ಹಿಡಿಯಬಹುದು.",
+    soilHealthScoreTitle: "ಮಣ್ಣಿನ ಆರೋಗ್ಯ ಸ್ಕೋರ್",
+    idealRange: "ಆದರ್ಶ ಶ್ರೇಣಿ",
+
+    // Plant Disease Analysis
     plantAnalysisTitle: "ಎಐ ಸಸ್ಯ ರೋಗ ವಿಶ್ಲೇಷಣೆ",
     plantAnalysisDescription: "ತ್ವರಿತ, ಅನಿಮೇಟೆಡ್ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ವಿಶ್ಲೇಷಣೆ ಪಡೆಯಲು ಪೀಡಿತ ಸಸ್ಯದ ಸ್ಪಷ್ಟ ಫೋಟೋವನ್ನು ಸೆರೆಹಿಡಿಯಿರಿ ಅಥವಾ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.",
     uploadPlantImagePrompt: "ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಕ್ಲಿಕ್ ಮಾಡಿ ಅಥವಾ ಎಳೆದು ಬಿಡಿ",
@@ -439,6 +509,37 @@ const knStrings = {
     lowRisk: "ಕಡಿಮೆ",
     affectedRegions: "ಹೆಚ್ಚು ಅಪಾಯದ ಪ್ರದೇಶಗಳು",
     recommendedAction: "ಶಿಫಾರಸು ಮಾಡಿದ ಪ್ರಾಥಮಿಕ ಕ್ರಮ",
+
+    // Marketplace
+    marketplaceTitle: "ಕೃಷಿ ಮಾರುಕಟ್ಟೆ",
+    marketplaceDescription: "ಕರ್ನಾಟಕದ ಪ್ರಮುಖ ಮಾರುಕಟ್ಟೆಗಳಲ್ಲಿ ನಿಮ್ಮ ಬೆಳೆಗಳಿಗೆ ನೈಜ-ಸಮಯದ ಬೆಲೆ ವಿಶ್ಲೇಷಣೆ ಪಡೆಯಿರಿ.",
+    selectMarket: "ಮುಖ್ಯ ಮಾರುಕಟ್ಟೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    selectCrop: "ಬೆಳೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    analyzePrices: "ಮಾರುಕಟ್ಟೆ ಬೆಲೆಗಳನ್ನು ವಿಶ್ಲೇಷಿಸಿ",
+    priceAnalysisFor: "ಬೆಲೆ ವಿಶ್ಲೇಷಣೆ:",
+    in: "ಸ್ಥಳ:",
+    minPrice: "ಕನಿಷ್ಠ ಬೆಲೆ",
+    maxPrice: "ಗರಿಷ್ಠ ಬೆಲೆ",
+    modalPrice: "ಮಾದರಿ (ಸರಾಸರಿ) ಬೆಲೆ",
+    priceTrend30Days: "ಬೆಲೆ ಪ್ರವೃತ್ತಿ (ಕಳೆದ ೩೦ ದಿನಗಳು)",
+    marketComparison: "ವಿವಿಧ ಮಾರುಕಟ್ಟೆಗಳಲ್ಲಿ ಬೆಲೆ ಹೋಲಿಕೆ (ಕ್ವಿಂಟಾಲ್‌ಗೆ)",
+    marketInsight: "AI ಮಾರುಕಟ್ಟೆ ಒಳನೋಟ",
+    loadingMarketAnalysis: "ಮಾರುಕಟ್ಟೆ ಡೇಟಾ ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ...",
+    sellYourCrop: "ನಿಮ್ಮ ಬೆಳೆಯನ್ನು ಮಾರಿ",
+    getEstimate: "ಬೆಲೆ ಅಂದಾಜು ಪಡೆಯಿರಿ",
+    quantity: "ಪ್ರಮಾಣ (ಕ್ವಿಂಟಾಲ್)",
+    quality: "ಗುಣಮಟ್ಟ",
+    estimatedValue: "ಅಂದಾಜು ಮೌಲ್ಯ",
+    bestMarketToSell: "ಮಾರಾಟಕ್ಕೆ ಅತ್ಯುತ್ತಮ ಮಾರುಕಟ್ಟೆ",
+
+    // User Profile
+    userProfileTitle: "ಬಳಕೆದಾರರ ವಿವರ",
+    editProfile: "ವಿವರ ತಿದ್ದುಪಡಿ",
+    accountVerified: "ಖಾತೆ ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
+    saveChanges: "ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಿ",
+    cancelEdit: "ರದ್ದುಮಾಡಿ",
+    fullNameLabel: "ಪೂರ್ಣ ಹೆಸರು",
+    locationLabel: "ಸ್ಥಳ",
 };
 
 

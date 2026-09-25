@@ -10,11 +10,14 @@
   },
   "dependencies": {
     "@google/genai": "^1.15.0",
+    "clsx": "^2.1.1",
     "firebase": "^12.11.0",
     "framer-motion": "^12.23.12",
+    "lucide-react": "^1.47.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-dropzone": "^14.3.8"
+    "react-dropzone": "^14.3.8",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

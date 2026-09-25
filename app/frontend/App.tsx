@@ -8,6 +8,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 // ... existing imports ...
 
+import { useLanguage } from './context/LanguageContext';
 import LandingPage from './components/LandingPage';
 import { uiStrings } from './constants';
 import { XCircleIcon } from './components/common/IconComponents';
@@ -29,13 +30,15 @@ import LegalPage from './components/pages/LegalPage';
 import LoadingScreen from './components/LoadingScreen';
 import AdminDashboard from './components/AdminDashboard';
 import MarketDashboard from './components/MarketDashboard';
+import FarmerDashboard from './components/farmer/FarmerDashboard';
+import BuyerDashboard from './components/buyer/BuyerDashboard';
 
 type Page = 'home' | 'about' | 'careers' | 'contact' | 'privacy' | 'terms' | 'admin_dashboard' | 'buyer_dashboard';
 
 const App: React.FC = () => {
+    const { language: currentLanguage, setLanguage: setCurrentLanguage, texts } = useLanguage();
     const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
     const [isAppLoading, setIsAppLoading] = useState(true); // Start loading true to check session
-    const [currentLanguage, setCurrentLanguage] = useState<Language>(Language.EN);
     const [theme, setTheme] = useState<'light' | 'dark'>('dark');
     const [isWeatherModalOpen, setIsWeatherModalOpen] = useState(false);
     const [isAssistantModalOpen, setIsAssistantModalOpen] = useState(false);
@@ -49,13 +52,14 @@ const App: React.FC = () => {
 
     const [showProfileCreation, setShowProfileCreation] = useState(false);
 
-    const texts = uiStrings[currentLanguage];
-
     // Helper to map role string to UserRole enum
-    const mapRoleToUserRole = (roleString: string): UserRole => {
-        switch (roleString) {
+    const mapRoleToUserRole = (roleString?: string): UserRole => {
+        switch (roleString?.toLowerCase()) {
             case 'buyer': return UserRole.BUYER;
-            case 'seller': return UserRole.USER; // Mapping Seller to User/Farmer
+            case 'seller': 
+            case 'farmer':
+            case 'user':
+                return UserRole.USER;
             case 'admin': return UserRole.ADMIN;
             default: return UserRole.USER;
         }
@@ -69,15 +73,18 @@ const App: React.FC = () => {
                     const userDocRef = doc(db, 'users', user.uid);
                     const userDoc = await getDoc(userDocRef);
                     
-                    let userRole = 'user';
+                    const savedPortalRole = sessionStorage.getItem('ava_active_portal_role') || localStorage.getItem('ava_active_portal_role');
+                    let userRole = savedPortalRole || 'user';
                     let fullName = user.displayName || 'User';
                     let details = {};
+                    let location = 'Karnataka, India';
                     
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
-                        userRole = userData.role || 'user';
-                        fullName = userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : fullName;
+                        userRole = savedPortalRole || userData.lastActiveRole || userData.role || 'user';
+                        fullName = userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : (userData.fullName || fullName);
                         details = userData.details || {};
+                        location = userData.location || location;
                     }
 
                     const parsedRole = mapRoleToUserRole(userRole);
@@ -86,7 +93,7 @@ const App: React.FC = () => {
                         email: user.email || '',
                         role: parsedRole,
                         fullName: fullName,
-                        location: 'Karnataka, India',
+                        location: location,
                         details: details
                     });
                 } else {
@@ -104,17 +111,7 @@ const App: React.FC = () => {
 
     const handleLoginSuccess = (user: UserProfile) => {
         setCurrentUser(user);
-
-        // Check if profile details are missing (Skip for Admin)
-        // Temporarily bypassing profile creation for all users as per request
-        if (false && user.role !== UserRole.ADMIN && (!user.details || Object.keys(user.details).length === 0)) {
-            setShowProfileCreation(true);
-            setIsAppLoading(false);
-        } else {
-            // No need for redundant setTimeout here, 
-            // the onAuthStateChanged listener already handles the redirect instantly.
-            setIsAppLoading(false);
-        }
+        setIsAppLoading(false);
     };
 
     const handleProfileComplete = (updatedUser: UserProfile) => {
@@ -129,6 +126,8 @@ const App: React.FC = () => {
 
     const handleLogout = async () => {
         try {
+            sessionStorage.removeItem('ava_active_portal_role');
+            localStorage.removeItem('ava_active_portal_role');
             await firebaseSignOut(auth);
         } catch (error) {
             console.error("Error signing out:", error);
@@ -212,8 +211,31 @@ const App: React.FC = () => {
             return <AdminDashboard user={currentUser} onLogout={handleLogout} onNavigate={setCurrentPage} />;
         }
 
-        if (currentPage === 'buyer_dashboard' && currentUser.role === UserRole.BUYER) {
-            return <MarketDashboard user={currentUser} onLogout={handleLogout} onNavigate={setCurrentPage} />;
+        if (currentUser.role === UserRole.BUYER) {
+            return (
+                <BuyerDashboard 
+                    user={currentUser} 
+                    onLogout={handleLogout} 
+                    onNavigate={setCurrentPage}
+                    currentLanguage={currentLanguage}
+                    setCurrentLanguage={setCurrentLanguage}
+                />
+            );
+        }
+
+        if (currentUser.role === UserRole.USER) {
+            if (currentPage !== 'home') {
+                return renderUserContent();
+            }
+            return (
+                <FarmerDashboard 
+                    user={currentUser} 
+                    onLogout={handleLogout} 
+                    onNavigate={setCurrentPage}
+                    currentLanguage={currentLanguage}
+                    setCurrentLanguage={setCurrentLanguage}
+                />
+            );
         }
 
         // Default Platform Content
@@ -258,158 +280,14 @@ const App: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {/* Modals - Accessible to all logged-in users from Platform Home */}
-            {currentUser && (
-                <AnimatePresence>
-                    {isWeatherModalOpen && (
-                        <motion.div
-                            className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                        >
-                            <motion.div
-                                className="w-full h-full relative"
-                                initial={{ scale: 0.9, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1, transition: { duration: 0.4, ease: "easeOut" } }}
-                                exit={{ scale: 0.9, opacity: 0, transition: { duration: 0.3, ease: "easeIn" } }}
-                            >
-                                <WeatherView texts={texts} currentLanguage={currentLanguage} />
-                                <button
-                                    onClick={() => setIsWeatherModalOpen(false)}
-                                    className="absolute top-4 right-4 bg-black/30 p-2 rounded-full text-white hover:bg-black/50 transition-colors z-50"
-                                    aria-label="Close weather"
-                                >
-                                    <XCircleIcon className="w-8 h-8" />
-                                </button>
-                            </motion.div>
-                        </motion.div>
-                    )}
-
-                    {isAssistantModalOpen && assistantProps && (
-                        <motion.div
-                            className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                        >
-                            <motion.div
-                                className="bg-gray-50 dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden relative"
-                                initial={{ scale: 0.95, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1, transition: { duration: 0.3, ease: "easeOut" } }}
-                                exit={{ scale: 0.95, opacity: 0, transition: { duration: 0.2, ease: "easeIn" } }}
-                            >
-                                <BhoomiAssistant {...assistantProps} />
-                                <button
-                                    onClick={() => setIsAssistantModalOpen(false)}
-                                    className="absolute top-3 right-3 bg-gray-800/50 p-2 rounded-full text-gray-200 hover:bg-gray-700/70 hover:text-white transition-colors z-50"
-                                    aria-label="Close assistant"
-                                >
-                                    <XCircleIcon className="w-6 h-6" />
-                                </button>
-                            </motion.div>
-                        </motion.div>
-                    )}
-
-                    {isSoilModalOpen && (
-                        <motion.div
-                            className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                        >
-                            <motion.div
-                                className="bg-gray-50 dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden relative"
-                                initial={{ scale: 0.95, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1, transition: { duration: 0.3, ease: "easeOut" } }}
-                                exit={{ scale: 0.95, opacity: 0, transition: { duration: 0.2, ease: "easeIn" } }}
-                            >
-                                <SoilAnalysis texts={texts} />
-                                <button
-                                    onClick={() => setIsSoilModalOpen(false)}
-                                    className="absolute top-4 right-4 bg-black/30 p-2 rounded-full text-white hover:bg-black/50 transition-colors z-50"
-                                    aria-label="Close Soil Analysis"
-                                >
-                                    <XCircleIcon className="w-8 h-8" />
-                                </button>
-                            </motion.div>
-                        </motion.div>
-                    )}
-
-                    {isPlantModalOpen && (
-                        <motion.div
-                            className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                        >
-                            <motion.div
-                                className="bg-gray-100 dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden relative"
-                                initial={{ scale: 0.95, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1, transition: { duration: 0.3, ease: "easeOut" } }}
-                                exit={{ scale: 0.95, opacity: 0, transition: { duration: 0.2, ease: "easeIn" } }}
-                            >
-                                <PlantAnalysis texts={texts} currentLanguage={currentLanguage} />
-                                <button
-                                    onClick={() => setIsPlantModalOpen(false)}
-                                    className="absolute top-4 right-4 bg-black/30 p-2 rounded-full text-white hover:bg-black/50 transition-colors z-50"
-                                    aria-label="Close Plant Analysis"
-                                >
-                                    <XCircleIcon className="w-8 h-8" />
-                                </button>
-                            </motion.div>
-                        </motion.div>
-                    )}
-
-                    {isMarketplaceModalOpen && (
-                        <motion.div
-                            className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                        >
-                            <motion.div
-                                className="bg-gray-100 dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden relative"
-                                initial={{ scale: 0.95, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1, transition: { duration: 0.3, ease: "easeOut" } }}
-                                exit={{ scale: 0.95, opacity: 0, transition: { duration: 0.2, ease: "easeIn" } }}
-                            >
-                                <MarketplaceView texts={texts} onClose={() => setIsMarketplaceModalOpen(false)} currentLanguage={currentLanguage} />
-                                <button
-                                    onClick={() => setIsMarketplaceModalOpen(false)}
-                                    className="absolute top-4 right-4 bg-black/30 p-2 rounded-full text-white hover:bg-black/50 transition-colors z-50"
-                                    aria-label="Close Marketplace"
-                                >
-                                    <XCircleIcon className="w-8 h-8" />
-                                </button>
-                            </motion.div>
-                        </motion.div>
-                    )}
-
-                    {isSellCropModalOpen && currentUser && (
-                        <SellCropModal
-                            onClose={() => setIsSellCropModalOpen(false)}
-                            user={currentUser}
-                            texts={texts}
-                        />
-                    )}
-
-                    {isMyRequestsModalOpen && currentUser && (
-                        <MyRequestsModal 
-                            onClose={() => setIsMyRequestsModalOpen(false)}
-                            user={currentUser}
-                        />
-                    )}
-
-                    {isProfileModalOpen && currentUser && (
-                        <UserProfileComponent
-                            user={currentUser}
-                            onClose={() => setIsProfileModalOpen(false)}
-                            texts={texts}
-                            onUpdateUser={handleUpdateUser}
-                        />
-                    )}
-                </AnimatePresence>
+            {/* Optional Profile Modal */}
+            {currentUser && isProfileModalOpen && (
+                <UserProfileComponent
+                    user={currentUser}
+                    onClose={() => setIsProfileModalOpen(false)}
+                    texts={texts}
+                    onUpdateUser={handleUpdateUser}
+                />
             )}
         </div>
     );

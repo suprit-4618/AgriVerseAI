@@ -11,6 +11,8 @@ export enum UserRole {
     ADMIN = 'admin',
 }
 
+export type KycStatus = 'verified' | 'pending' | 'unverified';
+
 export interface UserProfileDetails {
     // Farmer
     farmSize?: string;
@@ -30,11 +32,73 @@ export interface UserProfileDetails {
 export interface UserProfile {
     id: string;
     email: string;
+    phone?: string;
     role: UserRole;
+    lastActiveRole?: string;
     fullName: string;
     location: string;
     profileImageUrl?: string;
+    kycStatus?: KycStatus;
     details?: UserProfileDetails;
+    createdAt?: string;
+}
+
+export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED';
+
+export interface OrderContract {
+    id: string;
+    orderId: string;
+    requestId: string;
+    farmerId: string;
+    farmerName: string;
+    farmerPhone?: string;
+    buyerId: string;
+    buyerName: string;
+    buyerPhone?: string;
+    cropName: string;
+    quantity: number; // in Quintals
+    ratePerQuintal: number;
+    totalAmount: number;
+    marketFee: number; // 0% platform fee / verified
+    status: OrderStatus;
+    deliveryLocation?: string;
+    weighbridgeReceiptId?: string;
+    createdAt: string;
+    updatedAt: string;
+    timeline: {
+        status: OrderStatus;
+        timestamp: string;
+        note?: string;
+    }[];
+}
+
+export interface DiseaseLog {
+    id: string;
+    farmerId: string;
+    farmerName: string;
+    crop: string;
+    diseaseName: string;
+    confidenceScore: number;
+    severity: 'Low' | 'Moderate' | 'High' | 'Healthy';
+    organicRemedy: string[];
+    chemicalRemedy: string[];
+    preventionTips: string[];
+    imageUrl?: string;
+    location: string;
+    timestamp: string;
+}
+
+export interface MarketRateRecord {
+    id: string;
+    marketName: string;
+    district: string;
+    commodity: string;
+    minPrice: number;
+    maxPrice: number;
+    modalPrice: number;
+    priceTrend: 'UP' | 'DOWN' | 'STABLE';
+    changePercentage: string;
+    updatedAt: string;
 }
 
 export interface ChatMessage {

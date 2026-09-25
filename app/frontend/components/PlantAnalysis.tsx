@@ -22,14 +22,18 @@ const fileToDataURL = (file: File): Promise<string> => {
     });
 };
 
+import { UserProfile } from '../types';
+import { diseaseLogService } from '../services/diseaseLogService';
+
 const fileToBase64 = (dataUrl: string): string => dataUrl.split(',')[1];
 
 interface PlantAnalysisProps {
     texts: UIStringContent;
     currentLanguage: Language;
+    user?: UserProfile;
 }
 
-const PlantAnalysis: React.FC<PlantAnalysisProps> = ({ texts, currentLanguage }) => {
+const PlantAnalysis: React.FC<PlantAnalysisProps> = ({ texts, currentLanguage, user }) => {
     const [view, setView] = useState<'upload' | 'camera' | 'loading' | 'results' | 'error' | 'dashboard'>('upload');
     const [analysisResult, setAnalysisResult] = useState<PlantAnalysisReport | null>(null);
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -44,11 +48,26 @@ const PlantAnalysis: React.FC<PlantAnalysisProps> = ({ texts, currentLanguage })
             const result = await getPlantDiseaseAnalysis(base64Image, mimeType);
             setAnalysisResult(result);
             setView('results');
+
+            // Save to Firestore disease_logs collection in background
+            if (user?.id) {
+                try {
+                    await diseaseLogService.saveScanLog(
+                        user.id,
+                        user.fullName || 'Farmer',
+                        user.location || 'Karnataka, India',
+                        result.cropName?.en || 'Crop',
+                        result
+                    );
+                } catch (logErr) {
+                    console.warn('Failed to persist scan to Firestore disease_logs:', logErr);
+                }
+            }
         } catch (err: any) {
             setErrorMessage(err.message || texts.errorAnalysis);
             setView('error');
         }
-    }, [texts.errorAnalysis]);
+    }, [texts.errorAnalysis, user]);
 
     const handleFileAccepted = useCallback(async (files: File[]) => {
         const file = files[0];

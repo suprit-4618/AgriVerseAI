@@ -4,14 +4,14 @@ import { GEMINI_MODEL_TEXT, GEMINI_MODEL_VISION } from '../constants';
 import { SoilData, SoilAnalysisReport, PlantAnalysisReport, MarketAnalysisReport, SoilImageAnalysisReport, Language } from '../types';
 import { BHOOMI_SYSTEM_PROMPT } from './bhoomiPrompt';
 
-const API_KEY = process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
-
-if (!API_KEY) {
-  console.error("API_KEY for Gemini is not set in process.env.API_KEY");
-}
+const getGeminiKey = (): string => {
+  return (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+         (typeof process !== 'undefined' ? process.env.API_KEY || process.env.GEMINI_API_KEY : '') || 
+         '';
+};
 
 const ai = new GoogleGenAI({ 
-  apiKey: API_KEY || "",
+  apiKey: getGeminiKey(),
   apiVersion: 'v1beta'
 });
 
@@ -19,7 +19,7 @@ export const getBhoomiResponseStream = async (
   history: { role: 'user' | 'model'; text: string }[],
   currentLanguage: Language
 ) => {
-  if (!API_KEY) {
+  if (!getGeminiKey()) {
     throw new Error("API_KEY_MISSING");
   }
 
@@ -61,7 +61,7 @@ export const getBhoomiResponseStream = async (
  * @returns A structured soil analysis report.
  */
 export const getSoilAnalysis = async (data: SoilData, location: { district: string; taluk: string; village: string; }): Promise<SoilAnalysisReport> => {
-  if (!API_KEY) {
+  if (!getGeminiKey()) {
     throw new Error("API_KEY_MISSING");
   }
 
@@ -154,7 +154,7 @@ export const getSoilAnalysis = async (data: SoilData, location: { district: stri
  * @returns A structured plant analysis report with English and Kannada text.
  */
 export const getPlantDiseaseAnalysis = async (base64Image: string, imageMimeType: string): Promise<PlantAnalysisReport> => {
-  if (!API_KEY) {
+  if (!getGeminiKey()) {
     throw new Error("API_KEY_MISSING");
   }
 
@@ -399,7 +399,7 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
  * @returns A structured market analysis report.
  */
 export const getMarketAnalysis = async (cropName: string, marketName: string): Promise<MarketAnalysisReport> => {
-  if (!API_KEY) {
+  if (!getGeminiKey()) {
     throw new Error("API_KEY_MISSING");
   }
 
@@ -475,7 +475,7 @@ export const getMarketAnalysis = async (cropName: string, marketName: string): P
  * @returns A structured soil image analysis report.
  */
 export const getSoilAnalysisFromImage = async (base64Image: string, imageMimeType: string): Promise<SoilImageAnalysisReport> => {
-  if (!API_KEY) {
+  if (!getGeminiKey()) {
     throw new Error("API_KEY_MISSING");
   }
 
@@ -580,7 +580,7 @@ export const getPriceEstimate = async (
   marketName: string,
   weatherSummary: string
 ): Promise<{ min: number, max: number }> => {
-  if (!API_KEY) throw new Error("API_KEY_MISSING");
+  if (!getGeminiKey()) throw new Error("API_KEY_MISSING");
 
   const systemInstruction = `You are an AI agricultural economist specializing in the Karnataka market. Estimate the price range (min and max) in Indian Rupees (₹) per Quintal for a given crop sale request.
     Consider:
@@ -632,7 +632,7 @@ export const getPriceEstimate = async (
  * @returns A base64 encoded string of the audio data.
  */
 export const generateSpeech = async (text: string): Promise<string | undefined> => {
-  if (!API_KEY) {
+  if (!getGeminiKey()) {
     throw new Error("API_KEY_MISSING");
   }
 

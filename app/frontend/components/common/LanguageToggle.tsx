@@ -1,48 +1,61 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Language } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface LanguageToggleProps {
-  currentLanguage: Language;
-  setCurrentLanguage: (lang: Language) => void;
+  currentLanguage?: Language;
+  setCurrentLanguage?: (lang: Language) => void;
   size?: 'sm' | 'md';
 }
 
-const LanguageToggle: React.FC<LanguageToggleProps> = ({ currentLanguage, setCurrentLanguage, size = 'md' }) => {
-    const isEnglish = currentLanguage === Language.EN;
+const LanguageToggle: React.FC<LanguageToggleProps> = ({ currentLanguage: propLang, setCurrentLanguage: propSetLang, size = 'sm' }) => {
+    const langContext = useLanguage();
     
-    const sizeClasses = {
-        sm: { container: 'p-0.5 text-xs', button: 'px-2 py-0.5', layoutId: 'lang-toggle-sm' },
-        md: { container: 'p-1 text-sm', button: 'px-3 py-1', layoutId: 'lang-toggle-md' }
+    const activeLanguage = propLang || langContext.language;
+    const handleSetLanguage = (lang: Language) => {
+        langContext.setLanguage(lang);
+        if (propSetLang) {
+            propSetLang(lang);
+        }
     };
 
-    const styles = sizeClasses[size];
-
+    const isEnglish = activeLanguage === Language.EN;
+    
     return (
-        <div className={`relative flex items-center bg-gray-200/20 dark:bg-gray-900/50 rounded-full ${styles.container}`}>
-            {isEnglish && (
+        <div className="relative flex items-center bg-neutral-900 border border-neutral-800 rounded-lg p-0.5 text-xs font-mono">
+            {isEnglish ? (
                 <motion.div
-                    className="absolute left-0 top-0 bottom-0 w-1/2 bg-white dark:bg-gray-700 rounded-full shadow-sm"
-                    layoutId={styles.layoutId}
-                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    className="absolute left-0.5 top-0.5 bottom-0.5 w-[calc(50%-1px)] bg-white rounded-md shadow-sm"
+                    layoutId="lang-toggle-indicator"
+                    transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
+            ) : (
+                <motion.div
+                    className="absolute right-0.5 top-0.5 bottom-0.5 w-[calc(50%-1px)] bg-white rounded-md shadow-sm"
+                    layoutId="lang-toggle-indicator"
+                    transition={{ type: 'spring', stiffness: 400, damping: 35 }}
                 />
             )}
-            {!isEnglish && (
-                 <motion.div
-                    className="absolute right-0 top-0 bottom-0 w-1/2 bg-white dark:bg-gray-700 rounded-full shadow-sm"
-                    layoutId={styles.layoutId}
-                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                />
-            )}
+            
             <button
-                onClick={() => setCurrentLanguage(Language.EN)}
-                className={`relative w-1/2 rounded-full font-semibold transition-colors ${styles.button} ${isEnglish ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-300'}`}
+                type="button"
+                onClick={() => handleSetLanguage(Language.EN)}
+                className={`relative z-10 px-2.5 py-1 rounded-md font-bold transition-colors ${
+                    isEnglish ? 'text-black' : 'text-neutral-400 hover:text-white'
+                }`}
+                aria-label="Switch to English"
             >
                 EN
             </button>
+            
             <button
-                onClick={() => setCurrentLanguage(Language.KN)}
-                className={`relative w-1/2 rounded-full font-semibold transition-colors ${styles.button} ${!isEnglish ? 'text-green-600 dark:text-green-400 font-kannada' : 'text-gray-500 dark:text-gray-300 font-kannada'}`}
+                type="button"
+                onClick={() => handleSetLanguage(Language.KN)}
+                className={`relative z-10 px-2.5 py-1 rounded-md font-bold transition-colors ${
+                    !isEnglish ? 'text-black font-kannada' : 'text-neutral-400 hover:text-white font-kannada'
+                }`}
+                aria-label="Switch to Kannada"
             >
                 ಕ
             </button>
@@ -51,3 +64,4 @@ const LanguageToggle: React.FC<LanguageToggleProps> = ({ currentLanguage, setCur
 };
 
 export default LanguageToggle;
+
