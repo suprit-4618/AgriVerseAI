@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UIStringContent, Language, PlantAnalysisReport } from '../types';
 import { Button } from './ui/button';
+import { generateDiseaseExplanationAudio } from '../services/geminiService';
 import {
     CheckCircle2, AlertTriangle, ShieldAlert, Sparkles,
     Volume2, VolumeX, Printer, RotateCcw,
     Leaf, FlaskConical, ShieldCheck, ListChecks,
-    Activity, Gauge, Droplets, Wind, Thermometer
+    Activity, Gauge, Droplets, Wind, Thermometer,
+    Loader2
 } from 'lucide-react';
 
 const isKannada = (text: string): boolean => {
@@ -16,6 +18,26 @@ const isKannada = (text: string): boolean => {
         if (charCode >= 0x0C80 && charCode <= 0x0CFF) return true;
     }
     return false;
+};
+
+// Audio decoding helpers for Google AI Studio audio
+const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+    const binaryString = window.atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+};
+
+const convertPCM16ToFloat32 = (pcmData: ArrayBuffer): Float32Array => {
+    const int16Array = new Int16Array(pcmData);
+    const float32Array = new Float32Array(int16Array.length);
+    for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768.0;
+    }
+    return float32Array;
 };
 
 interface PlantAnalysisResultProps {
@@ -36,7 +58,47 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
     onConsultAssistant
 }) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
+    const [isLoadingAudio, setIsLoadingAudio] = useState(false);
     const [activeTreatmentTab, setActiveTreatmentTab] = useState<'organic' | 'chemical' | 'prevention'>('organic');
+
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const activeSourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+
+    const getAudioContext = (): AudioContext => {
+        if (!audioContextRef.current) {
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            audioContextRef.current = new AudioContextClass();
+        }
+        if (audioContextRef.current.state === 'suspended') {
+            audioContextRef.current.resume().catch(err => console.error("AudioContext resume error:", err));
+        }
+        return audioContextRef.current;
+    };
+
+    const stopAudio = () => {
+        if (activeSourceNodeRef.current) {
+            try {
+                activeSourceNodeRef.current.stop();
+                activeSourceNodeRef.current.disconnect();
+            } catch {}
+            activeSourceNodeRef.current = null;
+        }
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+        setIsSpeaking(false);
+        setIsLoadingAudio(false);
+    };
+
+    useEffect(() => {
+        return () => {
+            stopAudio();
+            if (audioContextRef.current) {
+                audioContextRef.current.close().catch(() => {});
+                audioContextRef.current = null;
+            }
+        };
+    }, []);
 
     const currentText = (localized?: { en: string; kn: string; }) => {
         if (!localized) return '';
@@ -86,18 +148,55 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
 
     const severityInfo = getSeverityBadge();
 
-    // Voice Readout implementation
-    const handleSpeak = () => {
-        if (isSpeaking) {
-            window.speechSynthesis.cancel();
-            setIsSpeaking(false);
+    // Voice Readout powered by Google AI Studio Gemini API
+    const handleSpeak = async () => {
+        if (isSpeaking || isLoadingAudio) {
+            stopAudio();
             return;
         }
 
-        if (!('speechSynthesis' in window)) {
-            console.warn("Speech synthesis not supported.");
-            return;
+        setIsLoadingAudio(true);
+
+        try {
+            // 1. Request Gemini Google AI Studio Audio model explanation
+            const base64Audio = await generateDiseaseExplanationAudio(result, language);
+
+            if (base64Audio) {
+                const ctx = getAudioContext();
+                const arrayBuffer = base64ToArrayBuffer(base64Audio);
+
+                let audioBuffer: AudioBuffer;
+                try {
+                    audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+                } catch {
+                    // Fallback to PCM16 at 24kHz
+                    const float32Data = convertPCM16ToFloat32(arrayBuffer);
+                    audioBuffer = ctx.createBuffer(1, float32Data.length, 24000);
+                    audioBuffer.copyToChannel(float32Data, 0);
+                }
+
+                const source = ctx.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(ctx.destination);
+                activeSourceNodeRef.current = source;
+
+                source.onended = () => {
+                    activeSourceNodeRef.current = null;
+                    setIsSpeaking(false);
+                };
+
+                setIsLoadingAudio(false);
+                setIsSpeaking(true);
+                source.start(0);
+                return;
+            }
+        } catch (geminiAudioError) {
+            console.warn("Gemini Audio error, falling back to Web Speech:", geminiAudioError);
         }
+
+        // Fallback: Browser Web Speech
+        setIsLoadingAudio(false);
+        if (!('speechSynthesis' in window)) return;
 
         const reportSections = [
             result.isDiseaseFound ? `${texts.diseaseName || 'Diagnosis'}: ${currentText(result.diseaseName)}` : (texts.healthyPlant || 'Healthy Plant'),
@@ -109,32 +208,22 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
         const fullReportText = reportSections.join('. ');
         if (!fullReportText.trim()) return;
 
-        const speak = () => {
-            const utterance = new SpeechSynthesisUtterance(fullReportText);
-            const detectedLanguageIsKannada = isKannada(fullReportText) || isKn;
+        const utterance = new SpeechSynthesisUtterance(fullReportText);
+        utterance.lang = isKn ? 'kn-IN' : 'en-US';
 
-            utterance.lang = detectedLanguageIsKannada ? 'kn-IN' : 'en-US';
-
-            const voices = window.speechSynthesis.getVoices();
-            if (voices.length > 0) {
-                const langPrefix = detectedLanguageIsKannada ? 'kn' : 'en';
-                const bestVoice = voices.find(v => v.lang.startsWith(langPrefix));
-                if (bestVoice) utterance.voice = bestVoice;
-            }
-
-            utterance.onstart = () => setIsSpeaking(true);
-            utterance.onend = () => setIsSpeaking(false);
-            utterance.onerror = () => setIsSpeaking(false);
-
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.speak(utterance);
-        };
-
-        if (window.speechSynthesis.getVoices().length === 0) {
-            window.speechSynthesis.onvoiceschanged = speak;
-        } else {
-            speak();
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+            const langPrefix = isKn ? 'kn' : 'en';
+            const bestVoice = voices.find(v => v.lang.startsWith(langPrefix));
+            if (bestVoice) utterance.voice = bestVoice;
         }
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
     };
 
     const handlePrint = () => {
@@ -187,11 +276,21 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
                         <Button
                             type="button"
                             onClick={handleSpeak}
+                            disabled={isLoadingAudio}
                             variant="outline"
                             size="sm"
-                            className="rounded-xl bg-neutral-800/80 hover:bg-neutral-700 text-white border-neutral-700 gap-2 shadow-md"
+                            className={`rounded-xl border-neutral-700 gap-2 shadow-md transition-all ${
+                                isSpeaking 
+                                    ? 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse' 
+                                    : 'bg-neutral-800/80 hover:bg-neutral-700 text-white'
+                            }`}
                         >
-                            {isSpeaking ? (
+                            {isLoadingAudio ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                                    <span className="text-xs">{isKn ? "ಧ್ವನಿ ತಯಾರಿಸಲಾಗುತ್ತಿದೆ..." : "Generating Audio..."}</span>
+                                </>
+                            ) : isSpeaking ? (
                                 <>
                                     <VolumeX className="w-4 h-4 text-red-400 animate-pulse" />
                                     <span className="text-xs">{isKn ? "ನಿಲ್ಲಿಸಿ" : "Stop"}</span>
@@ -199,7 +298,7 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
                             ) : (
                                 <>
                                     <Volume2 className="w-4 h-4 text-emerald-400" />
-                                    <span className="text-xs">{isKn ? "ಧ್ವನಿ ವಿವರಣೆ" : "Listen"}</span>
+                                    <span className="text-xs">{isKn ? "ಧ್ವನಿ ವಿವರಣೆ (Google AI)" : "Listen (Google AI)"}</span>
                                 </>
                             )}
                         </Button>

@@ -647,7 +647,7 @@ export const getPriceEstimate = async (
  * @param text The text to speak.
  * @returns A base64 encoded string of the audio data.
  */
-export const generateSpeech = async (text: string): Promise<string | undefined> => {
+export const generateSpeech = async (text: string, language: Language = Language.EN): Promise<string | undefined> => {
   if (!getGeminiKey()) {
     throw new Error("API_KEY_MISSING");
   }
@@ -663,7 +663,6 @@ export const generateSpeech = async (text: string): Promise<string | undefined> 
         responseModalities: ["AUDIO"],
         speechConfig: {
           voiceConfig: {
-            // Using 'Kore' as it provides a clear, neutral voice often suitable for assistants.
             prebuiltVoiceConfig: { voiceName: 'Kore' },
           },
         },
@@ -673,7 +672,39 @@ export const generateSpeech = async (text: string): Promise<string | undefined> 
     // Return the base64 audio data directly from the response
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   } catch (e) {
-    console.error("Error generating speech:", e);
+    console.error("Error generating speech with Gemini:", e);
     return undefined;
   }
+};
+
+/**
+ * Generates a full audio explanation of a plant pathology diagnosis using Google AI Studio Gemini API.
+ */
+export const generateDiseaseExplanationAudio = async (
+  report: PlantAnalysisReport,
+  language: Language
+): Promise<string | undefined> => {
+  if (!getGeminiKey()) {
+    throw new Error("API_KEY_MISSING");
+  }
+
+  const isKn = language === Language.KN;
+  const diseaseName = isKn ? (report.diseaseName?.kn || report.diseaseName?.en || 'ಬೆಳೆ ರೋಗ') : (report.diseaseName?.en || report.diseaseName?.kn || 'Crop Disease');
+  const cropName = isKn ? (report.cropName?.kn || report.cropName?.en || 'ಬೆಳೆ') : (report.cropName?.en || report.cropName?.kn || 'Crop');
+  const medicineName = isKn ? (report.treatment?.medicineName?.kn || report.treatment?.medicineName?.en || 'ಔಷಧ') : (report.treatment?.medicineName?.en || 'Prescribed Medicine');
+  const organicRemedy = isKn ? (report.treatment?.organicRemedy?.kn || report.treatment?.organicRemedy?.en || 'ಬೇವಿನ ಎಣ್ಣೆ ಸಿಂಪಡಿಸಿ') : (report.treatment?.organicRemedy?.en || 'Apply organic neem extract');
+  const confidencePct = Math.round((report.confidenceScore || 0.95) * 100);
+
+  let explanationScript = '';
+  if (!report.isDiseaseFound) {
+    explanationScript = isKn
+      ? `ನಮಸ್ಕಾರ ರೈತ ಮಿತ್ರರೇ. ನಿಮ್ಮ ${cropName} ಮಾದರಿಯನ್ನು ವಿಶ್ಲೇಷಿಸಲಾಗಿದೆ. ನಿಮ್ಮ ಬೆಳೆ ಸಂಪೂರ್ಣವಾಗಿ ಆರೋಗ್ಯಕರವಾಗಿದೆ, ಯಾವುದೇ ರೋಗದ ಲಕ್ಷಣಗಳಿಲ್ಲ. ಉತ್ತಮ ಇಳುವರಿಗಾಗಿ ನಿಯಮಿತ ನೀರಿನ ನಿರ್ವಹಣೆ ಮತ್ತು ಸಾವಯವ ಪೋಷಕಾಂಶಗಳನ್ನು ಮುಂದುವರಿಸಿ.`
+      : `Hello farmer. We analyzed your ${cropName} leaf specimen. Your crop is healthy with no pathological disease detected. Continue standard irrigation and organic nutrient management for optimal harvest.`;
+  } else {
+    explanationScript = isKn
+      ? `ನಮಸ್ಕಾರ ರೈತ ಮಿತ್ರರೇ. ನಿಮ್ಮ ${cropName} ಬೆಳೆಯಲ್ಲಿ ${diseaseName} ರೋಗ ಲಕ್ಷಣಗಳನ್ನು ನಮ್ಮ ಕೃತಕ ಬುದ್ಧಿಮತ್ತೆ ಲ್ಯಾಬ್ ಶೇಕಡಾ ${confidencePct} ರಷ್ಟು ನಿಖರತೆಯೊಂದಿಗೆ ಪತ್ತೆಹಚ್ಚಿದೆ. ತಕ್ಷಣದ ಸಾವಯವ ನಿಯಂತ್ರಣಕ್ಕಾಗಿ: ${organicRemedy}. ರಾಸಾಯನಿಕ ಪರಿಹಾರಕ್ಕಾಗಿ ${medicineName} ಔಷಧಿಯನ್ನು ಸೂಚಿಸಿದ ಪ್ರಮಾಣದಲ್ಲಿ ಸಂಜೆ ವೇಳೆ ಸಿಂಪಡಿಸಿ. ಹೆಚ್ಚಿನ ಮಾಹಿತಿಗಾಗಿ ಭೂಮಿ AI ಯನ್ನು ಸಂಪರ್ಕಿಸಿ.`
+      : `Hello farmer. Our AI pathology lab diagnosed ${diseaseName} on your ${cropName} with ${confidencePct}% confidence. For natural organic control: ${organicRemedy}. For conventional protection, spray ${medicineName} according to recommended dilution. Consult Bhoomi AI for any follow-up questions.`;
+  }
+
+  return generateSpeech(explanationScript, language);
 };
