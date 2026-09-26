@@ -224,11 +224,17 @@ const RadarView: React.FC = () => {
     );
 };
 
-const WeatherView: React.FC<{ texts: UIStringContent; currentLanguage: Language }> = ({ texts, currentLanguage }) => {
-    const [currentLocationName, setCurrentLocationName] = useState('Bangalore Urban');
+interface WeatherViewProps {
+    texts?: UIStringContent;
+    currentLanguage?: Language;
+    onClose?: () => void;
+}
+
+const WeatherView: React.FC<WeatherViewProps> = ({ texts, currentLanguage = Language.EN, onClose }) => {
+    const [currentLocationName, setCurrentLocationName] = useState('Bengaluru (Bangalore) Urban');
     const [currentCoords, setCurrentCoords] = useState<{ lat: number; lon: number }>({
-        lat: karnatakaDistricts[4].lat,
-        lon: karnatakaDistricts[4].lon
+        lat: karnatakaDistricts[4]?.lat || 12.97,
+        lon: karnatakaDistricts[4]?.lon || 77.59
     });
     const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
     const [airQuality, setAirQuality] = useState<AirQualityData | null>(null);
@@ -406,7 +412,10 @@ const WeatherView: React.FC<{ texts: UIStringContent; currentLanguage: Language 
         };
     }, []);
 
-    const convertTemp = (c: number) => unit === 'C' ? c : Math.round((c * 9 / 5) + 32);
+    const convertTemp = (c?: number | null) => {
+        if (c == null || isNaN(c)) return 0;
+        return unit === 'C' ? Math.round(c) : Math.round((c * 9 / 5) + 32);
+    };
 
     // Weather condition info
     const current = weatherData?.current;
@@ -427,8 +436,8 @@ const WeatherView: React.FC<{ texts: UIStringContent; currentLanguage: Language 
 
     if (loading && !weatherData) {
         return (
-            <div className={`w-full h-full flex flex-col items-center justify-center bg-gradient-to-br ${bgGradient} text-white`}>
-                <LoadingSpinner text={texts.loadingWeather} color="text-emerald-400" />
+            <div className={`w-full min-h-[500px] h-full flex flex-col items-center justify-center bg-gradient-to-br ${bgGradient} text-white p-8`}>
+                <LoadingSpinner text={texts?.loadingWeather || "Loading weather data..."} color="text-emerald-400" />
                 <p className="text-xs text-slate-400 mt-3 font-medium">Fetching real-time ECMWF & Open-Meteo hyperlocal observations...</p>
             </div>
         );
@@ -437,7 +446,7 @@ const WeatherView: React.FC<{ texts: UIStringContent; currentLanguage: Language 
     if (!weatherData || !current) return null;
 
     return (
-        <div className={`w-full h-full bg-gradient-to-br ${bgGradient} text-white flex flex-col overflow-hidden font-sans relative select-none`}>
+        <div className={`w-full min-h-[600px] h-full bg-gradient-to-br ${bgGradient} text-white flex flex-col overflow-hidden font-sans relative select-none rounded-3xl`}>
 
             {/* Glowing Orb Background Effects */}
             <div className="absolute top-10 left-1/4 w-96 h-96 bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
@@ -474,7 +483,7 @@ const WeatherView: React.FC<{ texts: UIStringContent; currentLanguage: Language 
                     </button>
                 </div>
 
-                {/* Right Controls: AI Voice Briefing & Unit Switcher */}
+                {/* Right Controls: AI Voice Briefing & Unit Switcher & Close Button */}
                 <div className="flex items-center gap-3">
                     {/* Google AI Studio Speech Briefing Button */}
                     <button
@@ -525,6 +534,17 @@ const WeatherView: React.FC<{ texts: UIStringContent; currentLanguage: Language 
                     >
                         °{unit}
                     </button>
+
+                    {/* Close Button if opened in modal */}
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="p-2.5 rounded-2xl bg-white/10 hover:bg-rose-500/30 border border-white/10 text-slate-300 hover:text-rose-200 transition-all ml-1"
+                            title="Close"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
             </header>
 

@@ -280,15 +280,172 @@ const App: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {/* Optional Profile Modal */}
-            {currentUser && isProfileModalOpen && (
-                <UserProfileComponent
-                    user={currentUser}
-                    onClose={() => setIsProfileModalOpen(false)}
-                    texts={texts}
-                    onUpdateUser={handleUpdateUser}
-                />
-            )}
+            {/* Global Feature Modals */}
+            <AnimatePresence>
+                {/* Weather Modal */}
+                {isWeatherModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="relative w-full max-w-6xl h-[90vh] bg-slate-950 rounded-3xl border border-white/15 overflow-hidden shadow-2xl flex flex-col"
+                        >
+                            <WeatherView
+                                texts={texts}
+                                currentLanguage={currentLanguage}
+                                onClose={() => setIsWeatherModalOpen(false)}
+                            />
+                        </motion.div>
+                    </motion.div>
+                )}
+
+                {/* Soil Analysis Modal */}
+                {isSoilModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="relative w-full max-w-6xl h-[90vh] bg-slate-950 rounded-3xl border border-white/15 overflow-hidden shadow-2xl flex flex-col"
+                        >
+                            <div className="flex justify-between items-center px-6 py-4 border-b border-white/10 bg-slate-900/80 backdrop-blur-md">
+                                <h3 className="font-bold text-base text-white font-mono uppercase tracking-wider">
+                                    {texts?.soilAnalysisTitle || "Soil Health & NPK Analyzer"}
+                                </h3>
+                                <button
+                                    onClick={() => setIsSoilModalOpen(false)}
+                                    className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                >
+                                    <XCircleIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                <SoilAnalysis texts={texts} />
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+
+                {/* Plant Disease Analysis Modal */}
+                {isPlantModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="relative w-full max-w-6xl h-[90vh] bg-slate-950 rounded-3xl border border-white/15 overflow-hidden shadow-2xl flex flex-col"
+                        >
+                            <div className="flex justify-between items-center px-6 py-4 border-b border-white/10 bg-slate-900/80 backdrop-blur-md">
+                                <h3 className="font-bold text-base text-white font-mono uppercase tracking-wider">
+                                    {texts?.plantAnalysisTitle || "Plant Pathology & Disease Diagnosis Lab"}
+                                </h3>
+                                <button
+                                    onClick={() => setIsPlantModalOpen(false)}
+                                    className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                >
+                                    <XCircleIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                <PlantAnalysis
+                                    texts={texts}
+                                    currentLanguage={currentLanguage}
+                                    user={currentUser || undefined}
+                                />
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+
+                {/* Bhoomi AI Assistant Modal */}
+                {isAssistantModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="relative w-full max-w-5xl h-[90vh] bg-slate-950 rounded-3xl border border-white/15 overflow-hidden shadow-2xl flex flex-col"
+                        >
+                            <BhoomiAssistant
+                                user={currentUser || undefined}
+                                currentLanguage={currentLanguage}
+                                setCurrentLanguage={setCurrentLanguage}
+                                onClose={() => setIsAssistantModalOpen(false)}
+                            />
+                        </motion.div>
+                    </motion.div>
+                )}
+
+                {/* Marketplace Modal */}
+                {isMarketplaceModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="relative w-full max-w-6xl h-[90vh] bg-slate-950 rounded-3xl border border-white/15 overflow-hidden shadow-2xl flex flex-col"
+                        >
+                            <MarketplaceView
+                                texts={texts}
+                                currentLanguage={currentLanguage}
+                                onClose={() => setIsMarketplaceModalOpen(false)}
+                            />
+                        </motion.div>
+                    </motion.div>
+                )}
+
+                {/* Sell Crop Modal */}
+                {isSellCropModalOpen && (
+                    <SellCropModal
+                        isOpen={isSellCropModalOpen}
+                        onClose={() => setIsSellCropModalOpen(false)}
+                    />
+                )}
+
+                {/* My Requests Modal */}
+                {isMyRequestsModalOpen && (
+                    <MyRequestsModal
+                        isOpen={isMyRequestsModalOpen}
+                        onClose={() => setIsMyRequestsModalOpen(false)}
+                    />
+                )}
+
+                {/* User Profile Modal */}
+                {currentUser && isProfileModalOpen && (
+                    <UserProfileComponent
+                        user={currentUser}
+                        onClose={() => setIsProfileModalOpen(false)}
+                        texts={texts}
+                        onUpdateUser={handleUpdateUser}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 };
