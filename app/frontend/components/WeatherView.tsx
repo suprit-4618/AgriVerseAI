@@ -14,7 +14,7 @@ import {
 import {
     Volume2, VolumeX, Navigation, Search, LocateFixed, Play, Pause, Square,
     RefreshCw, Layers, ShieldCheck, AlertTriangle, Radio, BarChart2, Droplets,
-    CloudSun, Wind, Gauge, Sparkles, Check, CheckCircle2, ChevronRight, X
+    CloudSun, Wind, Gauge, Sparkles, Check, CheckCircle2, ChevronRight, X, Sprout
 } from 'lucide-react';
 
 const glassCard = "bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-2xl rounded-3xl";
