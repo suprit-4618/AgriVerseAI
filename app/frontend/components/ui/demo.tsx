@@ -1,20 +1,27 @@
-"use client";
+import { ThinkingOrb } from "@/components/ui/thinking-orbs"
 
-import React from "react";
-import RuixenMoonChat from "@/components/ui/ruixen-moon-chat";
-
-export default function DemoPage() {
+// Solving — a single status pill, exactly as on the original site.
+export default function ThinkingOrbSolvingDemo() {
   return (
-    <main className="min-h-screen w-full bg-black text-white">
-      {/* Chat Component */}
-      <section className="flex justify-center items-start w-full">
-        <RuixenMoonChat />
-      </section>
-
-      {/* Footer */}
-      <footer className="text-center text-neutral-500 py-2 mt-10 border-t border-neutral-800 text-sm">
-        © {new Date().getFullYear()} Ruixen Demo Page
-      </footer>
-    </main>
-  );
+    <div className="flex min-h-[360px] w-full items-center justify-center bg-[#070707] p-8">
+      <div
+        className="inline-flex h-[74px] items-center gap-3 rounded-full pl-[9px] pr-8"
+        style={{
+          background: "rgba(29,29,29,0.42)",
+          boxShadow:
+            "inset 0 0 0 1px rgba(44,47,54,0.31), inset 0 0 50px 0 rgba(255,255,255,0.012)",
+        }}
+      >
+        <span className="[&_canvas]:!size-14">
+          <ThinkingOrb state="solving" size={64} theme="dark" />
+        </span>
+        <span
+          className="whitespace-nowrap text-lg leading-6"
+          style={{ color: "rgba(251,251,251,0.5)" }}
+        >
+          Solving….
+        </span>
+      </div>
+    </div>
+  )
 }

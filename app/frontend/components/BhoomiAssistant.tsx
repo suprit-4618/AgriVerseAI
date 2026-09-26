@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import LanguageToggle from './common/LanguageToggle';
 import ListeningAnimation from './common/ListeningAnimation';
-import GeneratingAnimation from './common/GeneratingAnimation';
+import { ThinkingOrb } from '@/components/ui/thinking-orbs';
 import MarkdownRenderer from './common/MarkdownRenderer';
 import PlantAnalysisResult from './PlantAnalysisResult';
 import './BhoomiGalaxyTheme.css';
@@ -1010,6 +1010,41 @@ const ChatScreen: React.FC<{
             <div className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 galaxy-scrollbar max-w-4xl w-full mx-auto">
                 {history.map((message, idx) => {
                     const isUser = message.role === 'user';
+                    const textContent = message.parts[0]?.text || '';
+                    const hasText = Boolean(textContent.trim());
+                    const hasPlantAnalysis = Boolean(message.plantAnalysis);
+
+                    // If this is a pending model response with no text yet and no plant analysis yet, show the ThinkingOrb solving state
+                    if (!isUser && !hasText && !hasPlantAnalysis) {
+                        return (
+                            <motion.div
+                                key={idx}
+                                initial={{ opacity: 0, y: 12 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="flex gap-3 items-center justify-start"
+                            >
+                                <div className="w-8 h-8 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center text-white shrink-0 shadow-lg mt-0.5">
+                                    <Sparkles className="w-4 h-4 text-white" />
+                                </div>
+                                <div
+                                    className="inline-flex h-[54px] sm:h-[60px] items-center gap-3 rounded-full pl-2 pr-6 border border-neutral-800/90 shadow-2xl backdrop-blur-xl"
+                                    style={{
+                                        background: "rgba(23, 23, 23, 0.75)",
+                                        boxShadow:
+                                            "inset 0 0 0 1px rgba(255,255,255,0.06), 0 8px 32px 0 rgba(0,0,0,0.37)",
+                                    }}
+                                >
+                                    <span className="[&_canvas]:!size-11 flex items-center justify-center">
+                                        <ThinkingOrb state="solving" size={64} theme="dark" />
+                                    </span>
+                                    <span className="whitespace-nowrap text-sm font-medium text-neutral-300 font-sans tracking-wide">
+                                        {isKn ? "ಭೂಮಿ AI ಯೋಚಿಸುತ್ತಿದೆ..." : "Bhoomi AI is analyzing..."}
+                                    </span>
+                                </div>
+                            </motion.div>
+                        );
+                    }
+
                     return (
                         <motion.div
                             key={idx}
@@ -1046,7 +1081,7 @@ const ChatScreen: React.FC<{
 
                                 {/* Message Content */}
                                 <div className="text-sm sm:text-base leading-relaxed break-words">
-                                    <MarkdownRenderer content={message.parts[0]?.text || ''} />
+                                    <MarkdownRenderer content={textContent} />
                                 </div>
 
                                 {/* Plant Disease Diagnostic Card if available */}
@@ -1056,8 +1091,8 @@ const ChatScreen: React.FC<{
                                     </div>
                                 )}
 
-                                {/* Copy / Actions bar on AI messages */}
-                                {!isUser && (
+                                {/* Copy / Actions bar on AI messages (rendered only if text exists) */}
+                                {!isUser && hasText && (
                                     <div className="mt-3 pt-2 border-t border-neutral-800 flex items-center justify-between text-xs text-neutral-400">
                                         <div className="flex items-center gap-2">
                                             {isSpeaking && (
@@ -1069,7 +1104,7 @@ const ChatScreen: React.FC<{
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => handleCopy(message.parts[0]?.text || '', idx)}
+                                            onClick={() => handleCopy(textContent, idx)}
                                             className="flex items-center gap-1 hover:text-white text-neutral-400 transition-colors p-1"
                                             title="Copy answer"
                                         >
@@ -1098,25 +1133,6 @@ const ChatScreen: React.FC<{
                         </motion.div>
                     );
                 })}
-
-                {/* Loading / Generating Animation */}
-                {isLoading && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex gap-3 items-center"
-                    >
-                        <div className="w-8 h-8 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center text-white shrink-0">
-                            <Sparkles className="w-4 h-4 animate-spin text-white" />
-                        </div>
-                        <div className="px-4 py-3 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-neutral-300 backdrop-blur-md shadow-lg flex items-center gap-3">
-                            <GeneratingAnimation />
-                            <span className="text-xs font-mono text-neutral-400">
-                                {isKn ? "ಭೂಮಿ AI ಯೋಚಿಸುತ್ತಿದೆ..." : "Bhoomi AI is analyzing..."}
-                            </span>
-                        </div>
-                    </motion.div>
-                )}
 
                 <div ref={chatEndRef} />
             </div>
