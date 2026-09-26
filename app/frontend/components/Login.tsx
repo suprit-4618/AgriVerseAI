@@ -17,6 +17,10 @@ import LanguageToggle from './common/LanguageToggle';
 import { useLanguage } from '../context/LanguageContext';
 
 import BhoomiAssistant from './BhoomiAssistant';
+import WeatherView from './WeatherView';
+import SoilAnalysis from './SoilAnalysis';
+import PlantAnalysis from './PlantAnalysis';
+import { XCircleIcon } from './common/IconComponents';
 
 interface LoginProps {
     onLoginSuccess: (user: UserProfile) => void;
@@ -31,6 +35,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const [view, setView] = useState<ViewState>('intro');
     const [authMode, setAuthMode] = useState<AuthMode>('login');
     const [isDemoAssistantOpen, setIsDemoAssistantOpen] = useState(false);
+    const [isDemoWeatherOpen, setIsDemoWeatherOpen] = useState(false);
+    const [isDemoSoilOpen, setIsDemoSoilOpen] = useState(false);
+    const [isDemoPlantOpen, setIsDemoPlantOpen] = useState(false);
 
     // Form States
     const [identifier, setIdentifier] = useState(''); // Email or Phone Number for login
@@ -284,10 +291,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     onEnterApp={() => setView('role-selection')}
                     currentLanguage={currentLanguage}
                     setCurrentLanguage={setCurrentLanguage}
-                    onWeatherClick={() => setView('role-selection')}
+                    onWeatherClick={() => setIsDemoWeatherOpen(true)}
                     onAssistantClick={() => setIsDemoAssistantOpen(true)}
-                    onPlantAnalysisClick={() => setView('role-selection')}
-                    onSoilAnalysisClick={() => setView('role-selection')}
+                    onPlantAnalysisClick={() => setIsDemoPlantOpen(true)}
+                    onSoilAnalysisClick={() => setIsDemoSoilOpen(true)}
                     onMarketplaceClick={() => setView('role-selection')}
                     onLogout={() => { }}
                     onProfileClick={() => setView('role-selection')}
@@ -295,8 +302,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     user={undefined}
                 />
 
-                {/* Free Demo Bhoomi Assistant Modal for Unauthenticated Guests */}
+                {/* Free Demo Modals for Unauthenticated Guests */}
                 <AnimatePresence>
+                    {/* 1. Bhoomi AI Assistant Demo */}
                     {isDemoAssistantOpen && (
                         <motion.div
                             key="bhoomi-demo-modal"
@@ -329,6 +337,99 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                                     }}
                                     onClose={() => setIsDemoAssistantOpen(false)}
                                 />
+                            </motion.div>
+                        </motion.div>
+                    )}
+
+                    {/* 2. Weather Intelligence Demo */}
+                    {isDemoWeatherOpen && (
+                        <motion.div
+                            key="weather-demo-modal"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/90 backdrop-blur-xl"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.95, y: 20 }}
+                                className="w-full max-w-6xl h-[90vh] bg-slate-950 border border-white/15 rounded-3xl overflow-hidden shadow-2xl relative flex flex-col"
+                            >
+                                <WeatherView
+                                    texts={texts}
+                                    currentLanguage={currentLanguage}
+                                    onClose={() => setIsDemoWeatherOpen(false)}
+                                />
+                            </motion.div>
+                        </motion.div>
+                    )}
+
+                    {/* 3. Soil Health & NPK Analyzer Demo */}
+                    {isDemoSoilOpen && (
+                        <motion.div
+                            key="soil-demo-modal"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/90 backdrop-blur-xl"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.95, y: 20 }}
+                                className="w-full max-w-6xl h-[90vh] bg-slate-950 border border-white/15 rounded-3xl overflow-hidden shadow-2xl relative flex flex-col"
+                            >
+                                <div className="flex justify-between items-center px-6 py-4 border-b border-white/10 bg-slate-900/80 backdrop-blur-md">
+                                    <h3 className="font-bold text-base text-white font-mono uppercase tracking-wider">
+                                        {texts?.soilAnalysisTitle || "Soil Health & NPK Analyzer"}
+                                    </h3>
+                                    <button
+                                        onClick={() => setIsDemoSoilOpen(false)}
+                                        className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                    >
+                                        <XCircleIcon className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                    <SoilAnalysis texts={texts} />
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+
+                    {/* 4. Plant Pathology Lab Demo */}
+                    {isDemoPlantOpen && (
+                        <motion.div
+                            key="plant-demo-modal"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/90 backdrop-blur-xl"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.95, y: 20 }}
+                                className="w-full max-w-6xl h-[90vh] bg-slate-950 border border-white/15 rounded-3xl overflow-hidden shadow-2xl relative flex flex-col"
+                            >
+                                <div className="flex justify-between items-center px-6 py-4 border-b border-white/10 bg-slate-900/80 backdrop-blur-md">
+                                    <h3 className="font-bold text-base text-white font-mono uppercase tracking-wider">
+                                        {texts?.plantAnalysisTitle || "Plant Pathology & Disease Diagnosis Lab"}
+                                    </h3>
+                                    <button
+                                        onClick={() => setIsDemoPlantOpen(false)}
+                                        className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                    >
+                                        <XCircleIcon className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                    <PlantAnalysis
+                                        texts={texts}
+                                        currentLanguage={currentLanguage}
+                                    />
+                                </div>
                             </motion.div>
                         </motion.div>
                     )}
