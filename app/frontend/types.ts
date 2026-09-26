@@ -280,6 +280,7 @@ export interface LocalizedStringArray {
 
 export interface PlantAnalysisReport {
     isDiseaseFound: boolean;
+    cropName?: LocalizedText;
     diseaseName: LocalizedText;
     confidenceScore: number;
     severity: LocalizedText;
@@ -289,6 +290,7 @@ export interface PlantAnalysisReport {
     treatment: {
         medicineName: LocalizedText;
         usageInstructions: LocalizedStringArray;
+        organicRemedy?: LocalizedText;
     };
     // New fields for the dashboard
     topDetections: {

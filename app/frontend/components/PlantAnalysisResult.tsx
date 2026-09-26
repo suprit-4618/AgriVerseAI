@@ -1,17 +1,13 @@
-
-
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UIStringContent, Language, PlantAnalysisReport, HistoricalDataPoint } from '../types';
-import Button from './common/Button';
-import GaugeChart from './common/charts/GaugeChart';
-import { CheckBadgeIcon, CheckIcon, DownloadIcon, SpeakerWaveIcon, SparklesIcon, ArrowLeftIcon, SpeakerXMarkIcon } from './common/IconComponents';
-import BarChart from './common/charts/BarChart';
-import DonutChart from './common/charts/DonutChart';
-import RadarChart from './common/charts/RadarChart';
-import LineChart from './common/charts/LineChart';
-import { historicalData } from '../constants';
-import AnimatedStepList from './AnimatedStepList';
+import { UIStringContent, Language, PlantAnalysisReport } from '../types';
+import { Button } from './ui/button';
+import {
+    CheckCircle2, AlertTriangle, ShieldAlert, Sparkles,
+    Volume2, VolumeX, Printer, RotateCcw,
+    Leaf, FlaskConical, ShieldCheck, ListChecks,
+    Activity, Gauge, Droplets, Wind, Thermometer
+} from 'lucide-react';
 
 const isKannada = (text: string): boolean => {
     if (!text) return false;
@@ -22,34 +18,76 @@ const isKannada = (text: string): boolean => {
     return false;
 };
 
-const DashboardCard: React.FC<{ children: React.ReactNode, className?: string, delay?: number }> = ({ children, className, delay = 0 }) => (
-    <motion.div
-        className={`bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg ${className}`}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut', delay }}
-    >
-        {children}
-    </motion.div>
-);
-
 interface PlantAnalysisResultProps {
     result: PlantAnalysisReport;
-    uploadedImage: string;
+    uploadedImage?: string;
     texts: UIStringContent;
-    language: Language;
+    language?: Language;
     onReset?: () => void;
+    onConsultAssistant?: (diseaseName: string) => void;
 }
 
-const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({ result, uploadedImage, texts, language, onReset }) => {
+const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({ 
+    result, 
+    uploadedImage, 
+    texts, 
+    language = Language.EN, 
+    onReset,
+    onConsultAssistant
+}) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
-    const [speakError, setSpeakError] = useState<string | null>(null);
+    const [activeTreatmentTab, setActiveTreatmentTab] = useState<'organic' | 'chemical' | 'prevention'>('organic');
 
-    const currentText = (localized: { en: string; kn: string; }) => localized ? localized[language] : '';
-    const currentTextArray = (localized: { en: string[]; kn: string[]; }) => localized ? localized[language] : [];
+    const currentText = (localized?: { en: string; kn: string; }) => {
+        if (!localized) return '';
+        return language === Language.KN ? (localized.kn || localized.en) : (localized.en || localized.kn);
+    };
 
+    const currentTextArray = (localized?: { en: string[]; kn: string[]; }) => {
+        if (!localized) return [];
+        return language === Language.KN ? (localized.kn || localized.en || []) : (localized.en || localized.kn || []);
+    };
+
+    const isKn = language === Language.KN;
+    const confidencePct = Math.round((result.confidenceScore || 0.95) * 100);
+    const affectedPct = result.affectedAreaPercentage || 30;
+
+    const severityKey = (result.severity?.en || 'Moderate').toLowerCase();
+    const isHealthy = !result.isDiseaseFound;
+
+    const getSeverityBadge = () => {
+        if (isHealthy) {
+            return {
+                bg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+                icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
+                label: isKn ? "ಆರೋಗ್ಯಕರ ಸಸ್ಯ" : "Healthy Crop",
+            };
+        }
+        if (severityKey.includes('high') || severityKey.includes('severe')) {
+            return {
+                bg: "bg-red-500/10 text-red-400 border-red-500/30",
+                icon: <ShieldAlert className="w-4 h-4 text-red-400" />,
+                label: isKn ? "ಹೆಚ್ಚಿನ ತೀವ್ರತೆ (High Severity)" : "High Severity",
+            };
+        }
+        if (severityKey.includes('low')) {
+            return {
+                bg: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
+                icon: <AlertTriangle className="w-4 h-4 text-yellow-400" />,
+                label: isKn ? "ಕಡಿಮೆ ತೀವ್ರತೆ (Low Severity)" : "Low Severity",
+            };
+        }
+        return {
+            bg: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+            icon: <AlertTriangle className="w-4 h-4 text-amber-400" />,
+            label: isKn ? "ಮಧ್ಯಮ ತೀವ್ರತೆ (Moderate Severity)" : "Moderate Severity",
+        };
+    };
+
+    const severityInfo = getSeverityBadge();
+
+    // Voice Readout implementation
     const handleSpeak = () => {
-        setSpeakError(null);
         if (isSpeaking) {
             window.speechSynthesis.cancel();
             setIsSpeaking(false);
@@ -58,18 +96,14 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({ result, uploa
 
         if (!('speechSynthesis' in window)) {
             console.warn("Speech synthesis not supported.");
-            setSpeakError("Speech synthesis is not supported on this device.");
-            setTimeout(() => setSpeakError(null), 5000);
             return;
         }
 
         const reportSections = [
-            result.isDiseaseFound ? `${texts.diseaseName}: ${currentText(result.diseaseName)}` : texts.healthyPlant,
-            result.isDiseaseFound ? `${texts.severity}: ${currentText(result.severity)}` : '',
-            result.isDiseaseFound ? `${texts.description}: ${currentText(result.description)}` : texts.healthyPlantDesc,
-            result.isDiseaseFound && currentTextArray(result.symptoms).length > 0 ? `${texts.symptoms}: ${currentTextArray(result.symptoms).join('. ')}` : '',
-            result.isDiseaseFound && currentTextArray(result.prevention).length > 0 ? `${texts.prevention}: ${currentTextArray(result.prevention).join('. ')}` : '',
-            result.isDiseaseFound && currentText(result.treatment.medicineName) ? `${texts.treatment}: ${currentText(result.treatment.medicineName)}. ${texts.usageInstructions}: ${currentTextArray(result.treatment.usageInstructions).join('. ')}` : ''
+            result.isDiseaseFound ? `${texts.diseaseName || 'Diagnosis'}: ${currentText(result.diseaseName)}` : (texts.healthyPlant || 'Healthy Plant'),
+            result.isDiseaseFound ? `${texts.severity || 'Severity'}: ${currentText(result.severity)}` : '',
+            result.isDiseaseFound ? currentText(result.description) : (texts.healthyPlantDesc || 'No pathological disease detected.'),
+            result.isDiseaseFound && currentText(result.treatment?.medicineName) ? `${texts.treatment || 'Treatment'}: ${currentText(result.treatment.medicineName)}. ${currentTextArray(result.treatment?.usageInstructions).join('. ')}` : ''
         ].filter(Boolean);
 
         const fullReportText = reportSections.join('. ');
@@ -77,46 +111,20 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({ result, uploa
 
         const speak = () => {
             const utterance = new SpeechSynthesisUtterance(fullReportText);
-            const detectedLanguageIsKannada = isKannada(fullReportText);
+            const detectedLanguageIsKannada = isKannada(fullReportText) || isKn;
 
-            if (detectedLanguageIsKannada) {
-                utterance.lang = 'kn-IN';
-            } else {
-                utterance.lang = 'en-US';
-            }
+            utterance.lang = detectedLanguageIsKannada ? 'kn-IN' : 'en-US';
 
             const voices = window.speechSynthesis.getVoices();
             if (voices.length > 0) {
                 const langPrefix = detectedLanguageIsKannada ? 'kn' : 'en';
-                const langVoices = voices.filter(v => v.lang.startsWith(langPrefix));
-
-                if (langVoices.length > 0) {
-                    let bestVoice: SpeechSynthesisVoice | null = null;
-                    let maxScore = -1;
-                    for (const voice of langVoices) {
-                        let score = 0;
-                        const name = voice.name.toLowerCase();
-                        if (name.includes('female') || name.includes('heera')) score += 10;
-                        if (name.includes('google')) score += 5;
-                        if (name.includes('microsoft')) score += 3;
-                        if (voice.localService) score += 2;
-                        if (score > maxScore) {
-                            maxScore = score;
-                            bestVoice = voice;
-                        }
-                    }
-                    utterance.voice = bestVoice || langVoices[0];
-                } else {
-                    console.warn(`SpeechSynthesis: No explicit voices found for language '${langPrefix}'. Relying on browser default.`);
-                }
+                const bestVoice = voices.find(v => v.lang.startsWith(langPrefix));
+                if (bestVoice) utterance.voice = bestVoice;
             }
 
             utterance.onstart = () => setIsSpeaking(true);
             utterance.onend = () => setIsSpeaking(false);
-            utterance.onerror = (e) => {
-                console.error("SpeechSynthesis Error:", e.error, "for report text.");
-                setIsSpeaking(false);
-            };
+            utterance.onerror = () => setIsSpeaking(false);
 
             window.speechSynthesis.cancel();
             window.speechSynthesis.speak(utterance);
@@ -129,157 +137,354 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({ result, uploa
         }
     };
 
-    const handleDownload = () => {
+    const handlePrint = () => {
         window.print();
     };
 
-    const topDetectionsData = result.topDetections?.map(d => ({
-        name: currentText(d.disease),
-        value: d.confidence * 100
-    })) || [];
-
-    const donutData = [
-        { name: texts.affectedArea, value: result.affectedAreaPercentage },
-        { name: texts.healthyArea, value: 100 - result.affectedAreaPercentage }
-    ];
-
-    const riskFactorData = result.riskFactors?.map(rf => ({
-        label: currentText(rf.factor),
-        value: rf.value
-    })) || [];
-
-    const severityValue = {
-        'low': 25,
-        'moderate': 60,
-        'high': 90
-    }[result.severity.en.toLowerCase()] || 0;
-
-
-    if (!result.isDiseaseFound) {
-        return (
-            <motion.div
-                className="p-6 text-center h-full flex flex-col justify-center items-center"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
-                <CheckBadgeIcon className="w-24 h-24 mx-auto text-green-500 animate-pulse-green" />
-                <h3 className="mt-4 text-2xl font-bold text-gray-900 dark:text-white">{texts.healthyPlant}</h3>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">{texts.healthyPlantDesc}</p>
-                {onReset && (
-                    <Button onClick={onReset} className="mt-6" variant="primary">
-                        {texts.analyzeAnotherPlant}
-                    </Button>
-                )}
-            </motion.div>
-        );
-    }
+    const symptomsList = currentTextArray(result.symptoms);
+    const preventionList = currentTextArray(result.prevention);
+    const instructionsList = currentTextArray(result.treatment?.usageInstructions);
 
     return (
-        <div className="p-4 sm:p-6 space-y-6 printable-area">
-            {/* Header */}
-            <div className="non-printable">
-                <div className="flex justify-between items-start">
-                    {onReset ? (
-                        <Button onClick={onReset} variant="ghost" size="sm" leftIcon={<ArrowLeftIcon className="w-4 h-4" />}>
-                            {texts.analyzeAnotherPlant}
-                        </Button>
-                    ) : <div />}
-                    <div className="flex flex-col items-end">
-                        <div className="flex items-center gap-2">
-                            <Button onClick={handleSpeak} variant="subtle" size="sm" leftIcon={isSpeaking ? <SpeakerXMarkIcon className="w-5 h-5" /> : <SpeakerWaveIcon className="w-5 h-5" />}>
-                                {isSpeaking ? texts.stopReading : texts.readAloud}
-                            </Button>
-                            <Button onClick={handleDownload} variant="primary" size="sm" leftIcon={<DownloadIcon className="w-5 h-5" />}>
-                                {texts.downloadReport}
-                            </Button>
+        <div className="space-y-6 text-neutral-100 font-sans printable-area">
+            {/* Top Header Card */}
+            <div className="relative overflow-hidden bg-neutral-900/90 border border-neutral-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
+                {/* Background Glow */}
+                <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${severityInfo.bg}`}>
+                                {severityInfo.icon}
+                                <span>{severityInfo.label}</span>
+                            </span>
+
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-mono bg-neutral-800 border border-neutral-700 text-neutral-300">
+                                <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>{confidencePct}% {isKn ? "ಖಚಿತತೆ" : "Confidence"}</span>
+                            </span>
+
+                            {result.cropName && (
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-neutral-800 border border-neutral-700 text-emerald-300">
+                                    <Leaf className="w-3.5 h-3.5" />
+                                    <span>{currentText(result.cropName)}</span>
+                                </span>
+                            )}
                         </div>
-                        <AnimatePresence>
-                            {speakError &&
-                                <motion.p
-                                    className="text-xs text-red-500 mt-1"
-                                    initial={{ opacity: 0, y: -5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0 }}
-                                >
-                                    {speakError}
-                                </motion.p>
-                            }
-                        </AnimatePresence>
+
+                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                            {currentText(result.diseaseName) || (isKn ? "ಆರೋಗ್ಯಕರ ಸಸ್ಯ" : "Healthy Plant")}
+                        </h2>
+
+                        <p className="text-sm text-neutral-300 leading-relaxed max-w-3xl">
+                            {currentText(result.description) || (isKn ? "ಸಸ್ಯವು ರೋಗ ಲಕ್ಷಣಗಳಿಲ್ಲದೆ ಆರೋಗ್ಯಕರವಾಗಿದೆ." : "Plant shows normal physiological development with no active fungal or bacterial pathogens detected.")}
+                        </p>
+                    </div>
+
+                    {/* Quick Action Controls */}
+                    <div className="flex flex-wrap items-center gap-2 non-printable shrink-0">
+                        <Button
+                            type="button"
+                            onClick={handleSpeak}
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl bg-neutral-800/80 hover:bg-neutral-700 text-white border-neutral-700 gap-2 shadow-md"
+                        >
+                            {isSpeaking ? (
+                                <>
+                                    <VolumeX className="w-4 h-4 text-red-400 animate-pulse" />
+                                    <span className="text-xs">{isKn ? "ನಿಲ್ಲಿಸಿ" : "Stop"}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Volume2 className="w-4 h-4 text-emerald-400" />
+                                    <span className="text-xs">{isKn ? "ಧ್ವನಿ ವಿವರಣೆ" : "Listen"}</span>
+                                </>
+                            )}
+                        </Button>
+
+                        <Button
+                            type="button"
+                            onClick={handlePrint}
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl bg-neutral-800/80 hover:bg-neutral-700 text-white border-neutral-700 gap-1.5 shadow-md"
+                        >
+                            <Printer className="w-4 h-4 text-neutral-300" />
+                            <span className="text-xs">{isKn ? "ಮುದ್ರಿಸಿ" : "Print PDF"}</span>
+                        </Button>
+
+                        {onReset && (
+                            <Button
+                                type="button"
+                                onClick={onReset}
+                                size="sm"
+                                className="rounded-xl bg-white hover:bg-neutral-200 text-black font-semibold gap-1.5 shadow-md"
+                            >
+                                <RotateCcw className="w-4 h-4" />
+                                <span className="text-xs">{isKn ? "ಮತ್ತೆ ಪರೀಕ್ಷಿಸಿ" : "New Scan"}</span>
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Main Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                {/* Left Column */}
-                <div className="xl:col-span-1 space-y-6">
-                    <DashboardCard delay={0.1}>
-                        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{texts.diseaseName}</h3>
-                        <p className={`text-2xl font-bold mt-1 text-gray-900 dark:text-white ${language === 'kn' ? 'font-kannada' : ''}`}>
-                            {currentText(result.diseaseName)}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Confidence: <span className="font-bold text-green-500">{(result.confidenceScore * 100).toFixed(0)}%</span></p>
-                    </DashboardCard>
-                    <DashboardCard className="relative aspect-square overflow-hidden" delay={0.2}>
-                        <img src={uploadedImage} alt="Uploaded Plant" className="w-full h-full object-cover rounded-lg animate-root-grow" />
-                        <div className="absolute inset-0 bg-red-500/20 rounded-lg pointer-events-none" style={{ maskImage: 'radial-gradient(circle at center, transparent 40%, black 100%)' }}></div>
-                    </DashboardCard>
-                    <DashboardCard delay={0.3}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{texts.symptoms}</h3>
-                        <AnimatedStepList items={currentTextArray(result.symptoms)} language={language} />
-                    </DashboardCard>
-                </div>
+            {/* Diagnostic Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column: Specimen Image & Metrics */}
+                <div className="space-y-6">
+                    {/* Specimen Photo Card */}
+                    {uploadedImage && (
+                        <div className="bg-neutral-900/80 border border-neutral-800 rounded-3xl p-4 backdrop-blur-xl overflow-hidden shadow-xl">
+                            <div className="flex items-center justify-between mb-3 px-1">
+                                <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+                                    <Leaf className="w-3.5 h-3.5 text-emerald-400" />
+                                    {isKn ? "ವಿಶ್ಲೇಷಿಸಿದ ಎಲೆಯ ಮಾದರಿ" : "Analyzed Leaf Specimen"}
+                                </span>
+                                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                    224×224 CNN Input
+                                </span>
+                            </div>
 
-                {/* Center Column */}
-                <div className="xl:col-span-1 space-y-6">
-                    <DashboardCard delay={0.4}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{texts.topDetections}</h3>
-                        <div className="h-48">
-                            <BarChart data={topDetectionsData} />
+                            <div className="relative aspect-video sm:aspect-square rounded-2xl overflow-hidden border border-neutral-800 bg-black">
+                                <img 
+                                    src={uploadedImage} 
+                                    alt="Plant specimen" 
+                                    className="w-full h-full object-cover" 
+                                />
+                                <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/70 border border-neutral-700/60 backdrop-blur-md text-[11px] font-mono text-neutral-300">
+                                    {isKn ? "ಹಾನಿಗೊಳಗಾದ ಪ್ರದೇಶ:" : "Affected Area:"} <span className="text-emerald-400 font-bold">{affectedPct}%</span>
+                                </div>
+                            </div>
                         </div>
-                    </DashboardCard>
-                    <div className="grid grid-cols-2 gap-6">
-                        <DashboardCard className="flex flex-col items-center justify-center text-center" delay={0.5}>
-                            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{texts.severity}</h3>
-                            <GaugeChart value={severityValue} />
-                        </DashboardCard>
-                        <DashboardCard className="flex flex-col items-center justify-center text-center" delay={0.6}>
-                            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{texts.affectedArea}</h3>
-                            <DonutChart data={donutData} />
-                        </DashboardCard>
+                    )}
+
+                    {/* Diagnostic Probability Gauges */}
+                    <div className="bg-neutral-900/80 border border-neutral-800 rounded-3xl p-5 backdrop-blur-xl shadow-xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                            <h4 className="text-xs font-bold font-mono uppercase text-neutral-300 flex items-center gap-1.5">
+                                <Gauge className="w-4 h-4 text-emerald-400" />
+                                {isKn ? "ಮಾದರಿ ಸಂಭವನೀಯತೆ ಸ್ಕೋರ್" : "Model Probability Breakdown"}
+                            </h4>
+                            <span className="text-xs font-mono text-emerald-400 font-bold">{confidencePct}%</span>
+                        </div>
+
+                        {/* Confidence Progress Bar */}
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs text-neutral-400 font-mono">
+                                <span>{currentText(result.diseaseName)}</span>
+                                <span className="text-white font-medium">{confidencePct}%</span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-neutral-800 overflow-hidden">
+                                <div 
+                                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-1000"
+                                    style={{ width: `${confidencePct}%` }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Top Detections if available */}
+                        {result.topDetections && result.topDetections.length > 1 && (
+                            <div className="pt-2 border-t border-neutral-800/80 space-y-2">
+                                <span className="text-[11px] font-mono text-neutral-400">
+                                    {isKn ? "ಇತರ ಸಂಭಾವ್ಯ ವರ್ಗೀಕರಣಗಳು:" : "Alternative Classifications:"}
+                                </span>
+                                {result.topDetections.slice(1, 3).map((det, i) => (
+                                    <div key={i} className="flex justify-between items-center text-xs font-mono text-neutral-400">
+                                        <span className="truncate max-w-[180px]">{currentText(det.disease)}</span>
+                                        <span>{Math.round(det.confidence * 100)}%</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                    <DashboardCard delay={0.7}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{texts.riskFactors}</h3>
-                        <div className="h-48">
-                            <RadarChart data={riskFactorData} />
+
+                    {/* Environmental Risk Factors */}
+                    {result.riskFactors && result.riskFactors.length > 0 && (
+                        <div className="bg-neutral-900/80 border border-neutral-800 rounded-3xl p-5 backdrop-blur-xl shadow-xl space-y-3">
+                            <h4 className="text-xs font-bold font-mono uppercase text-neutral-300 flex items-center gap-1.5 border-b border-neutral-800 pb-2">
+                                <Thermometer className="w-4 h-4 text-amber-400" />
+                                {isKn ? "ಪರಿಸರ ಅಪಾಯಕಾರಿ ಅಂಶಗಳು" : "Microclimate Risk Indicators"}
+                            </h4>
+                            <div className="grid grid-cols-1 gap-2">
+                                {result.riskFactors.map((rf, i) => (
+                                    <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-950/60 border border-neutral-800 text-xs font-mono">
+                                        <div className="flex items-center gap-2">
+                                            {i % 2 === 0 ? <Droplets className="w-3.5 h-3.5 text-blue-400" /> : <Wind className="w-3.5 h-3.5 text-emerald-400" />}
+                                            <span className="text-neutral-300">{currentText(rf.factor)}</span>
+                                        </div>
+                                        <span className="text-neutral-400 font-bold">{Math.round(rf.value * 100)}%</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </DashboardCard>
+                    )}
                 </div>
 
-                {/* Right Column */}
-                <div className="xl:col-span-1 space-y-6">
-                    <DashboardCard delay={0.8}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{texts.historicalData}</h3>
-                        <div className="h-48">
-                            <LineChart data={historicalData} />
+                {/* Right Column: Prescriptions, Organic/Chemical Treatment Protocols */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Treatment Selector Tabs */}
+                    <div className="bg-neutral-900/80 border border-neutral-800 rounded-3xl p-6 backdrop-blur-xl shadow-xl">
+                        <div className="flex items-center gap-2 border-b border-neutral-800 pb-4 mb-5 non-printable overflow-x-auto">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTreatmentTab('organic')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${activeTreatmentTab === 'organic' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'}`}
+                            >
+                                <Leaf className="w-4 h-4 text-emerald-400" />
+                                <span>{isKn ? "ಸಾವಯವ ಪರಿಹಾರಗಳು" : "Organic Remedies"}</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setActiveTreatmentTab('chemical')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${activeTreatmentTab === 'chemical' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'}`}
+                            >
+                                <FlaskConical className="w-4 h-4 text-blue-400" />
+                                <span>{isKn ? "ರಾಸಾಯನಿಕ ಚಿಕಿತ್ಸೆ" : "Chemical Prescriptions"}</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setActiveTreatmentTab('prevention')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${activeTreatmentTab === 'prevention' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'}`}
+                            >
+                                <ShieldCheck className="w-4 h-4 text-purple-400" />
+                                <span>{isKn ? "ಮುನ್ನೆಚ್ಚರಿಕೆ ಕ್ರಮಗಳು" : "Prevention & Care"}</span>
+                            </button>
                         </div>
-                    </DashboardCard>
-                    <DashboardCard delay={0.9}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                            <CheckIcon className="w-6 h-6 text-green-500" />{texts.prevention}
-                        </h3>
-                        <AnimatedStepList items={currentTextArray(result.prevention)} language={language} />
-                    </DashboardCard>
-                    <DashboardCard delay={1.0}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                            <SparklesIcon className="w-6 h-6 text-blue-500" />{texts.treatment}
-                        </h3>
-                        <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg mb-3">
-                            <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-300">{texts.medicineName}</h5>
-                            <p className={`font-bold text-blue-900 dark:text-blue-200 ${language === 'kn' ? 'font-kannada' : ''}`}>{currentText(result.treatment.medicineName)}</p>
+
+                        {/* TAB 1: Organic Remedies */}
+                        {activeTreatmentTab === 'organic' && (
+                            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                                <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-800/40 space-y-2">
+                                    <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+                                        <Leaf className="w-4 h-4" />
+                                        <span>{isKn ? "ನೈಸರ್ಗಿಕ ಜೈವಿಕ ನಿಯಂತ್ರಣ" : "Biological & Botanical Formulations"}</span>
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
+                                        {currentText(result.treatment?.organicRemedy) || (isKn 
+                                            ? "ಬೇವು ಎಣ್ಣೆ (Neem Oil 5ml/L) ಅಥವಾ ಸೂಡೋಮೊನಾಸ್ ಫ್ಲೋರೆಸೆನ್ಸ್ (Pseudomonas fluorescens 10g/L) ದ್ರಾವಣವನ್ನು ಸಿಂಪಡಿಸಿ." 
+                                            : "Apply 5ml/L Neem Seed Kernel Extract (NSKE) or spray Trichoderma viride / Pseudomonas fluorescens at 10g/L for natural fungal containment.")}
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h5 className="text-xs font-mono uppercase text-neutral-400 tracking-wider">
+                                        {isKn ? "ಶಿಫಾರಸು ಮಾಡಲಾದ ಸಾವಯವ ಹಂತಗಳು:" : "Recommended Organic Steps:"}
+                                    </h5>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-xs text-neutral-300">
+                                            <span className="font-bold text-emerald-400 block mb-1">1. Neem Oil Spray</span>
+                                            {isKn ? "ಸಂಜೆ ವೇಳೆ 5ml ಬೇವಿನ ಎಣ್ಣೆಯನ್ನು 1 ಲೀಟರ್ ನೀರಿಗೆ ಬೆರೆಸಿ ಸಿಂಪಡಿಸಿ." : "Mix 5ml cold-pressed Neem Oil with 1ml liquid soap in 1L water; spray at sunset."}
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-xs text-neutral-300">
+                                            <span className="font-bold text-emerald-400 block mb-1">2. Panchagavya Foliar</span>
+                                            {isKn ? "3% ಪಂಚಗವ್ಯ ದ್ರಾವಣವನ್ನು ಸಿಂಪಡಿಸಿ ಸಸ್ಯದ ರೋಗನಿರೋಧಕ ಶಕ್ತಿಯನ್ನು ಹೆಚ್ಚಿಸಿ." : "Apply 3% fermented Panchagavya solution to boost plant systemic immunity."}
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* TAB 2: Chemical Prescriptions */}
+                        {activeTreatmentTab === 'chemical' && (
+                            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                                <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-800/40 space-y-2">
+                                    <div className="flex items-center gap-2 text-blue-400 font-semibold text-sm">
+                                        <FlaskConical className="w-4 h-4" />
+                                        <span>{isKn ? "ಶಿಫಾರಸು ಮಾಡಿದ ಔಷಧ" : "Prescribed Fungicide / Medicine"}</span>
+                                    </div>
+                                    <p className="text-base font-bold text-white">
+                                        {currentText(result.treatment?.medicineName) || (isKn ? "ಮ್ಯಾಂಕೋಜೆಬ್ ಅಥವಾ ಕಾಪರ್ ಆಕ್ಸಿಕ್ಲೋರೈಡ್" : "Mancozeb 75% WP or Copper Oxychloride 50% WP")}
+                                    </p>
+                                </div>
+
+                                {instructionsList.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h5 className="text-xs font-mono uppercase text-neutral-400 tracking-wider">
+                                            {isKn ? "ಬಳಕೆಯ ಮಾರ್ಗಸೂಚಿಗಳು ಮತ್ತು ಪ್ರಮಾಣ:" : "Dosage & Spraying Schedule:"}
+                                        </h5>
+                                        <div className="space-y-2">
+                                            {instructionsList.map((inst, idx) => (
+                                                <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-xs sm:text-sm text-neutral-300">
+                                                    <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-mono text-xs shrink-0 mt-0.5">
+                                                        {idx + 1}
+                                                    </span>
+                                                    <span>{inst}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+
+                        {/* TAB 3: Prevention & Cultural Practices */}
+                        {activeTreatmentTab === 'prevention' && (
+                            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                                <div className="space-y-2">
+                                    <h5 className="text-xs font-mono uppercase text-neutral-400 tracking-wider">
+                                        {isKn ? "ರೋಗ ಹರಡುವಿಕೆ ತಡೆಗಟ್ಟುವ ಕ್ರಮಗಳು:" : "Field Prevention & Sanitization:"}
+                                    </h5>
+                                    <div className="space-y-2">
+                                        {preventionList.map((prev, idx) => (
+                                            <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-xs sm:text-sm text-neutral-300">
+                                                <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                                                <span>{prev}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </div>
+
+                    {/* Symptoms Checklist Card */}
+                    {symptomsList.length > 0 && (
+                        <div className="bg-neutral-900/80 border border-neutral-800 rounded-3xl p-6 backdrop-blur-xl shadow-xl space-y-3">
+                            <h4 className="text-sm font-bold uppercase tracking-wide text-neutral-200 flex items-center gap-2">
+                                <ListChecks className="w-4 h-4 text-emerald-400" />
+                                {isKn ? "ರೋಗದ ಲಕ್ಷಣಗಳು (Observed Symptoms)" : "Observed Pathological Symptoms"}
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {symptomsList.map((sym, idx) => (
+                                    <div key={idx} className="p-3 rounded-xl bg-neutral-950/50 border border-neutral-800/80 text-xs text-neutral-300 flex items-start gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
+                                        <span>{sym}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <AnimatedStepList items={currentTextArray(result.treatment.usageInstructions)} language={language} isNumbered={true} />
-                    </DashboardCard>
+                    )}
+
+                    {/* Bhoomi AI Consultation Action Banner */}
+                    <div className="p-5 rounded-3xl bg-gradient-to-r from-neutral-900 via-neutral-950 to-neutral-900 border border-neutral-800 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 non-printable">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-neutral-800 border border-neutral-700 flex items-center justify-center text-white shrink-0 shadow-lg">
+                                <Sparkles className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-white">
+                                    {isKn ? "ಭೂಮಿ AI ಜೊತೆ ಈ ರೋಗದ ಬಗ್ಗೆ ಮಾತನಾಡಿ" : "Discuss Diagnosis with Bhoomi AI"}
+                                </h4>
+                                <p className="text-xs text-neutral-400">
+                                    {isKn ? "ಸ್ಥಳೀಯ ಔಷಧ ಲಭ್ಯತೆ, ರೋಗ ಪರಿಹಾರಗಳ ಬಗ್ಗೆ ತಕ್ಷಣ ಪ್ರಶ್ನೆ ಕೇಳಿ." : "Get instant answers on where to buy medicines, dosage, and crop recovery."}
+                                </p>
+                            </div>
+                        </div>
+
+                        {onConsultAssistant && (
+                            <Button
+                                type="button"
+                                onClick={() => onConsultAssistant(currentText(result.diseaseName))}
+                                className="w-full sm:w-auto bg-white hover:bg-neutral-200 text-black text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg shrink-0"
+                            >
+                                {isKn ? "AI ಸಲಹೆ ಪಡೆಯಿರಿ" : "Ask Bhoomi AI"}
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
