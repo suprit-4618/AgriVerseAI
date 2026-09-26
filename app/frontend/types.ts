@@ -123,6 +123,16 @@ export interface ExampleCategory {
     prompts: ExamplePrompt[];
 }
 
+export interface LocationResult {
+    id?: number | string;
+    name: string;
+    admin1?: string; // State / Region
+    admin2?: string; // District / Taluk
+    country?: string;
+    latitude: number;
+    longitude: number;
+}
+
 export interface DailyForecast {
     time: string;
     weatherCode: number;
@@ -133,6 +143,8 @@ export interface DailyForecast {
     sunset: string;
     rainSum?: number;
     windSpeedMax?: number;
+    precipitationProbabilityMax?: number;
+    evapotranspiration?: number;
 }
 
 export interface HourlyForecast {
@@ -141,9 +153,15 @@ export interface HourlyForecast {
     weatherCode: number;
     precipitationProbability: number;
     windSpeed?: number;
+    humidity?: number;
+    soilMoisture?: number;
+    soilTemperature?: number;
 }
 
 export interface WeatherData {
+    locationName?: string;
+    latitude?: number;
+    longitude?: number;
     timezone: string;
     current: {
         temperature: number;
@@ -155,6 +173,9 @@ export interface WeatherData {
         humidity: number;
         windDirection: number;
         rain?: number;
+        pressure?: number;
+        soilMoisture?: number;
+        soilTemperature?: number;
     };
     daily: DailyForecast[];
     hourly: HourlyForecast[];
