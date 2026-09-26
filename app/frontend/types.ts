@@ -279,6 +279,9 @@ export interface LocalizedStringArray {
 }
 
 export interface PlantAnalysisReport {
+    isValidPlant?: boolean;
+    isBlurry?: boolean;
+    validationMessage?: LocalizedText;
     isDiseaseFound: boolean;
     cropName?: LocalizedText;
     diseaseName: LocalizedText;
@@ -291,6 +294,7 @@ export interface PlantAnalysisReport {
         medicineName: LocalizedText;
         usageInstructions: LocalizedStringArray;
         organicRemedy?: LocalizedText;
+        organicSteps?: LocalizedStringArray;
     };
     // New fields for the dashboard
     topDetections: {

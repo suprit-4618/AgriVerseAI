@@ -308,24 +308,39 @@ export const getPlantDiseaseAnalysis = async (base64Image: string, imageMimeType
   // Fallback to Gemini AI (Vision)
   console.log('🤖 Using Gemini AI Vision for full analysis');
 
-  const systemInstruction = `You are a highly specialized AI-powered plant disease diagnostic tool. Your core is a sophisticated computer vision system, conceptually similar to a Convolutional Neural Network (CNN), that has been extensively trained and fine-tuned on the comprehensive 'PlantVillage' dataset, containing over 50,000 images of healthy and diseased plants. Your primary function is to perform an accurate, data-driven classification of the provided plant image.
+  const systemInstruction = `You are a world-class AI plant pathologist and agricultural diagnostic specialist. You must analyze the provided image with extreme clinical precision.
 
-Your task is to analyze the image and generate a detailed JSON report. Follow these rules strictly:
-
-1.  **Bilingual Requirement**: All text fields that are objects MUST contain 'en' and 'kn' keys with English and precise Kannada (in Kannada script) translations. This is non-negotiable.
-2.  **Classification First**: Your first step is to classify the disease. If the plant is healthy, set 'isDiseaseFound' to false and populate the report with information about a healthy plant. Otherwise, identify the primary disease.
-3.  **Confidence and Severity**: Provide a precise 'confidenceScore' (a float from 0.0 to 1.0) for your top diagnosis. Determine the 'severity' and classify it as 'Low', 'Moderate', or 'High'.
-4.  **Top Detections**: Your output must include a 'topDetections' array. List the top 3 most likely classifications from your model (including 'Healthy' if it's a possibility), each with its corresponding confidence score. This simulates the output of a multi-class classifier.
-5.  **Technical Description**: In the 'description' field, start your analysis by briefly mentioning the methodology. For example: "Based on a deep learning analysis of visual patterns such as leaf discoloration and lesion texture, the model identifies features consistent with...".
-6.  **Detailed Information**: Provide a comprehensive 'description' of the disease, list key 'symptoms', actionable 'prevention' steps, and a 'treatment' plan. For treatment, recommend a specific 'medicineName' (can be a chemical compound or brand name) and clear 'usageInstructions'.
-7.  **Dashboard Metrics**:
-    - Estimate the 'affectedAreaPercentage' (0-100) visible in the image.
-    - List 3-5 key environmental or biological 'riskFactors' (e.g., 'High Humidity', 'Poor Airflow') with a value from 0 to 1 indicating their contribution to the disease's likelihood.
-8.  **Strict JSON Adherence**: The final output MUST strictly adhere to the provided JSON schema. If a field is not applicable (e.g., 'treatment' for a healthy plant), provide sensible defaults like empty strings or arrays, but do not omit the keys.`;
+CRITICAL FIRST CHECKS:
+1. **Plant Verification ('isValidPlant')**:
+   - Check if the image contains an actual plant, crop, leaf, stem, flower, fruit, or agricultural produce.
+   - If the image is a landscape, mountain, building, road, person, animal, vehicle, abstract graphic, indoor furniture, or non-plant object:
+     Set 'isValidPlant' to false, 'isDiseaseFound' to false, 'confidenceScore' to 0, 'cropName' to { "en": "Non-Plant Image", "kn": "ಸಸ್ಯವಲ್ಲದ ಚಿತ್ರ" }, 'diseaseName' to { "en": "Invalid Subject", "kn": "ಅಮಾನ್ಯ ವಿಷಯ" }, and set 'validationMessage' to { "en": "The uploaded image does not appear to contain a crop or plant leaf. Please upload a clear photo of a plant leaf or crop.", "kn": "ಅಪ್‌ಲೋಡ್ ಮಾಡಿದ ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಬೆಳೆ ಅಥವಾ ಸಸ್ಯದ ಎಲೆ ಕಂಡುಬಂದಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆಯ ಎಲೆಯ ಸ್ಪಷ್ಟ ಫೋಟೋವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ." }.
+2. **Image Quality & Blur Check ('isBlurry')**:
+   - If the image is too blurry, heavily out of focus, or dark to diagnose:
+     Set 'isBlurry' to true, 'confidenceScore' to 0, and set 'validationMessage' to { "en": "The image is too blurry or out of focus for accurate diagnosis. Please take a sharper, focused photo of the affected leaf.", "kn": "ರೋಗವನ್ನು ನಿಖರವಾಗಿ ಪತ್ತೆಹಚ್ಚಲು ಚಿತ್ರವು ತುಂಬಾ ಮಸುಕಾಗಿದೆ. ದಯವಿಟ್ಟು ಸ್ಪಷ್ಟ ಮತ್ತು ಫೋಕಸ್ ಮಾಡಿದ ಫೋಟೋ ತೆಗೆಯಿರಿ." }.
+3. **Crop & Pathological Classification**:
+   - Identify the exact crop name (e.g. Tomato, Cotton, Potato, Apple, Rose, Rice, Wheat, Pepper, Grape, Corn, Citrus, etc.).
+   - Classify if there is an active pathological disease (fungal, bacterial, viral, nutrient deficiency, insect infestation) or if the plant is completely healthy.
+   - If healthy: Set 'isDiseaseFound' to false, 'diseaseName' to { "en": "Healthy Plant", "kn": "ಆರೋಗ್ಯಕರ ಸಸ್ಯ" }.
+   - In 'description': Provide an authoritative, technical yet clear pathological diagnosis explanation (e.g. "Based on a deep learning analysis of visual patterns such as leaf discoloration and lesion texture, the model identifies features consistent with Black Spot...").
+4. **DYNAMIC & DISEASE-SPECIFIC Organic Remedies**:
+   - DO NOT give a generic fallback! Remedies must be specific to the identified condition:
+     - For fungal leaf spots/blight: Bacillus subtilis, Trichoderma viride, Bordeaux mixture 1%, Copper soap, bio-compost tea.
+     - For Powdery Mildew: Potassium bicarbonate (3g/L), diluted milk-water spray (1:9 ratio), wettable sulfur.
+     - For Black Spot: Bio-fungicide Bacillus subtilis or baking soda (5g) + horticultural oil (5ml) in 1L water.
+     - For Bacterial diseases: Pseudomonas fluorescens (10g/L), copper hydroxide, Streptomyces bio-antagonist.
+     - For Pests/Mites: Beauveria bassiana, insecticidal potassium salts, yellow sticky traps.
+     - For Healthy Plants: DO NOT prescribe pesticide or neem sprays! Instead provide organic plant nutrition and soil health advice (e.g., apply 2kg decomposed vermicompost per plant, organic straw mulching to conserve moisture, seaweed bio-stimulant foliar spray).
+   - In 'treatment.organicSteps': Provide 2-3 specific, actionable steps tailored to this disease or healthy maintenance.
+5. **Chemical Prescriptions**:
+   - Provide the exact chemical molecule and trade name (e.g. Mancozeb 75% WP, Chlorothalonil, Hexaconazole, Azoxystrobin, Copper Oxychloride), with dilution ratio per liter of water and spray timing in 'usageInstructions'.
+   - If healthy: 'medicineName' should be { "en": "No chemical treatment required", "kn": "ಯಾವುದೇ ರಾಸಾಯನಿಕ ಚಿಕಿತ್ಸೆಯ ಅಗತ್ಯವಿಲ್ಲ" }.
+6. **Bilingual Requirement**:
+   - Every localized text field MUST contain authentic English ('en') and natural, accurate Kannada ('kn' in Kannada script).`;
 
   const contents: Part[] = [
     { inlineData: { mimeType: imageMimeType, data: base64Image } },
-    { text: "Analyze this plant image and provide a bilingual, structured dashboard report based on your CNN-like, dataset-trained model." },
+    { text: "Analyze this image with clinical plant pathology standards. Check if it is a valid plant, check clarity, classify disease, and provide disease-specific organic and chemical protocols." },
   ];
 
   const localizedTextSchema = {
@@ -349,7 +364,11 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
+      isValidPlant: { type: Type.BOOLEAN },
+      isBlurry: { type: Type.BOOLEAN },
+      validationMessage: localizedTextSchema,
       isDiseaseFound: { type: Type.BOOLEAN },
+      cropName: localizedTextSchema,
       diseaseName: localizedTextSchema,
       confidenceScore: { type: Type.NUMBER },
       severity: localizedTextSchema,
@@ -360,8 +379,11 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
         type: Type.OBJECT,
         properties: {
           medicineName: localizedTextSchema,
-          usageInstructions: localizedStringArraySchema
-        }
+          usageInstructions: localizedStringArraySchema,
+          organicRemedy: localizedTextSchema,
+          organicSteps: localizedStringArraySchema
+        },
+        required: ["medicineName", "usageInstructions", "organicRemedy", "organicSteps"]
       },
       topDetections: {
         type: Type.ARRAY,
@@ -385,6 +407,7 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
         }
       }
     },
+    required: ["isValidPlant", "isDiseaseFound", "diseaseName", "confidenceScore", "severity", "description", "symptoms", "prevention", "treatment"]
   };
 
   try {
@@ -395,7 +418,7 @@ Your task is to analyze the image and generate a detailed JSON report. Follow th
         systemInstruction: { parts: [{ text: systemInstruction }] },
         responseMimeType: "application/json",
         responseSchema: responseSchema,
-        temperature: 0.3,
+        temperature: 0.2,
       },
     });
 
@@ -678,7 +701,7 @@ export const generateSpeech = async (text: string, language: Language = Language
 };
 
 /**
- * Generates a full audio explanation of a plant pathology diagnosis using Google AI Studio Gemini API.
+ * Speaks the exact diagnostic explanation text that appears on the screen using Google AI Studio Gemini TTS.
  */
 export const generateDiseaseExplanationAudio = async (
   report: PlantAnalysisReport,
@@ -689,22 +712,12 @@ export const generateDiseaseExplanationAudio = async (
   }
 
   const isKn = language === Language.KN;
-  const diseaseName = isKn ? (report.diseaseName?.kn || report.diseaseName?.en || 'ಬೆಳೆ ರೋಗ') : (report.diseaseName?.en || report.diseaseName?.kn || 'Crop Disease');
-  const cropName = isKn ? (report.cropName?.kn || report.cropName?.en || 'ಬೆಳೆ') : (report.cropName?.en || report.cropName?.kn || 'Crop');
-  const medicineName = isKn ? (report.treatment?.medicineName?.kn || report.treatment?.medicineName?.en || 'ಔಷಧ') : (report.treatment?.medicineName?.en || 'Prescribed Medicine');
-  const organicRemedy = isKn ? (report.treatment?.organicRemedy?.kn || report.treatment?.organicRemedy?.en || 'ಬೇವಿನ ಎಣ್ಣೆ ಸಿಂಪಡಿಸಿ') : (report.treatment?.organicRemedy?.en || 'Apply organic neem extract');
-  const confidencePct = Math.round((report.confidenceScore || 0.95) * 100);
+  // Use the exact description text that was output by the model and displayed on screen
+  const exactDescription = isKn
+    ? (report.description?.kn || report.description?.en || '')
+    : (report.description?.en || report.description?.kn || '');
 
-  let explanationScript = '';
-  if (!report.isDiseaseFound) {
-    explanationScript = isKn
-      ? `ನಮಸ್ಕಾರ ರೈತ ಮಿತ್ರರೇ. ನಿಮ್ಮ ${cropName} ಮಾದರಿಯನ್ನು ವಿಶ್ಲೇಷಿಸಲಾಗಿದೆ. ನಿಮ್ಮ ಬೆಳೆ ಸಂಪೂರ್ಣವಾಗಿ ಆರೋಗ್ಯಕರವಾಗಿದೆ, ಯಾವುದೇ ರೋಗದ ಲಕ್ಷಣಗಳಿಲ್ಲ. ಉತ್ತಮ ಇಳುವರಿಗಾಗಿ ನಿಯಮಿತ ನೀರಿನ ನಿರ್ವಹಣೆ ಮತ್ತು ಸಾವಯವ ಪೋಷಕಾಂಶಗಳನ್ನು ಮುಂದುವರಿಸಿ.`
-      : `Hello farmer. We analyzed your ${cropName} leaf specimen. Your crop is healthy with no pathological disease detected. Continue standard irrigation and organic nutrient management for optimal harvest.`;
-  } else {
-    explanationScript = isKn
-      ? `ನಮಸ್ಕಾರ ರೈತ ಮಿತ್ರರೇ. ನಿಮ್ಮ ${cropName} ಬೆಳೆಯಲ್ಲಿ ${diseaseName} ರೋಗ ಲಕ್ಷಣಗಳನ್ನು ನಮ್ಮ ಕೃತಕ ಬುದ್ಧಿಮತ್ತೆ ಲ್ಯಾಬ್ ಶೇಕಡಾ ${confidencePct} ರಷ್ಟು ನಿಖರತೆಯೊಂದಿಗೆ ಪತ್ತೆಹಚ್ಚಿದೆ. ತಕ್ಷಣದ ಸಾವಯವ ನಿಯಂತ್ರಣಕ್ಕಾಗಿ: ${organicRemedy}. ರಾಸಾಯನಿಕ ಪರಿಹಾರಕ್ಕಾಗಿ ${medicineName} ಔಷಧಿಯನ್ನು ಸೂಚಿಸಿದ ಪ್ರಮಾಣದಲ್ಲಿ ಸಂಜೆ ವೇಳೆ ಸಿಂಪಡಿಸಿ. ಹೆಚ್ಚಿನ ಮಾಹಿತಿಗಾಗಿ ಭೂಮಿ AI ಯನ್ನು ಸಂಪರ್ಕಿಸಿ.`
-      : `Hello farmer. Our AI pathology lab diagnosed ${diseaseName} on your ${cropName} with ${confidencePct}% confidence. For natural organic control: ${organicRemedy}. For conventional protection, spray ${medicineName} according to recommended dilution. Consult Bhoomi AI for any follow-up questions.`;
-  }
+  if (!exactDescription.trim()) return undefined;
 
-  return generateSpeech(explanationScript, language);
+  return generateSpeech(exactDescription.trim(), language);
 };

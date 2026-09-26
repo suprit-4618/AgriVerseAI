@@ -8,17 +8,8 @@ import {
     Volume2, VolumeX, Printer, RotateCcw,
     Leaf, FlaskConical, ShieldCheck, ListChecks,
     Activity, Gauge, Droplets, Wind, Thermometer,
-    Loader2
+    Loader2, ImageOff, EyeOff
 } from 'lucide-react';
-
-const isKannada = (text: string): boolean => {
-    if (!text) return false;
-    for (let i = 0; i < text.length; i++) {
-        const charCode = text.charCodeAt(i);
-        if (charCode >= 0x0C80 && charCode <= 0x0CFF) return true;
-    }
-    return false;
-};
 
 // Audio decoding helpers for Google AI Studio audio
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
@@ -111,6 +102,54 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
     };
 
     const isKn = language === Language.KN;
+    const isInvalidPlant = result.isValidPlant === false;
+    const isBlurry = result.isBlurry === true;
+
+    // IF IMAGE IS NOT A PLANT OR BLURRY, RENDER CLEAR DIAGNOSTIC REJECTION CARD
+    if (isInvalidPlant || isBlurry) {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="max-w-2xl mx-auto p-8 rounded-3xl bg-neutral-900/90 border border-neutral-800 backdrop-blur-xl text-center space-y-6 shadow-2xl"
+            >
+                <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto shadow-xl">
+                    {isBlurry ? <EyeOff className="w-8 h-8" /> : <ImageOff className="w-8 h-8" />}
+                </div>
+
+                <div className="space-y-2">
+                    <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                        {isBlurry
+                            ? (isKn ? "ಚಿತ್ರವು ತುಂಬಾ ಮಸುಕಾಗಿದೆ (Blurry Photo)" : "Image is Blurry / Out of Focus")
+                            : (isKn ? "ಸಸ್ಯ ಅಥವಾ ಬೆಳೆ ಕಂಡುಬಂದಿಲ್ಲ (Not a Plant)" : "Image is Not a Recognized Crop / Plant")}
+                    </h3>
+                    <p className="text-sm text-neutral-300 max-w-lg mx-auto leading-relaxed">
+                        {currentText(result.validationMessage) || (isBlurry
+                            ? (isKn ? "ರೋಗವನ್ನು ನಿಖರವಾಗಿ ಗುರುತಿಸಲು ಚಿತ್ರವು ತುಂಬಾ ಮಸುಕಾಗಿದೆ. ದಯವಿಟ್ಟು ಎಲೆಯ ಸ್ಪಷ್ಟ ಮತ್ತು ಫೋಕಸ್ ಮಾಡಿದ ಫೋಟೋ ತೆಗೆಯಿರಿ." : "The image is too blurry or out of focus for accurate diagnosis. Please take a sharper, focused photo of the plant leaf.")
+                            : (isKn ? "ಅಪ್‌ಲೋಡ್ ಮಾಡಿದ ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಬೆಳೆ ಅಥವಾ ಸಸ್ಯದ ಎಲೆ ಕಂಡುಬಂದಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆಯ ಎಲೆಯ ಸ್ಪಷ್ಟ ಫೋಟೋವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ." : "The uploaded image does not appear to contain a crop or plant leaf. Please upload a clear photo of a crop or plant."))}
+                    </p>
+                </div>
+
+                {uploadedImage && (
+                    <div className="max-w-xs mx-auto aspect-video rounded-2xl overflow-hidden border border-neutral-800 bg-black shadow-lg">
+                        <img src={uploadedImage} alt="Uploaded preview" className="w-full h-full object-cover opacity-70" />
+                    </div>
+                )}
+
+                {onReset && (
+                    <Button
+                        type="button"
+                        onClick={onReset}
+                        className="bg-white hover:bg-neutral-200 text-black font-semibold rounded-xl px-6 py-3 shadow-lg gap-2"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                        <span>{isKn ? "ಸ್ಪಷ್ಟ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ" : "Take / Upload Clear Photo"}</span>
+                    </Button>
+                )}
+            </motion.div>
+        );
+    }
+
     const confidencePct = Math.round((result.confidenceScore || 0.95) * 100);
     const affectedPct = result.affectedAreaPercentage || 30;
 
@@ -148,7 +187,7 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
 
     const severityInfo = getSeverityBadge();
 
-    // Voice Readout powered by Google AI Studio Gemini API
+    // Voice Readout: SPEAKS THE EXACT DIAGNOSTIC EXPLANATION TEXT DISPLAYED ON SCREEN
     const handleSpeak = async () => {
         if (isSpeaking || isLoadingAudio) {
             stopAudio();
@@ -158,7 +197,7 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
         setIsLoadingAudio(true);
 
         try {
-            // 1. Request Gemini Google AI Studio Audio model explanation
+            // 1. Request Google AI Studio Gemini TTS for the exact explanation text
             const base64Audio = await generateDiseaseExplanationAudio(result, language);
 
             if (base64Audio) {
@@ -194,21 +233,14 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
             console.warn("Gemini Audio error, falling back to Web Speech:", geminiAudioError);
         }
 
-        // Fallback: Browser Web Speech
+        // Fallback: Browser Web Speech (speaking the exact description text)
         setIsLoadingAudio(false);
         if (!('speechSynthesis' in window)) return;
 
-        const reportSections = [
-            result.isDiseaseFound ? `${texts.diseaseName || 'Diagnosis'}: ${currentText(result.diseaseName)}` : (texts.healthyPlant || 'Healthy Plant'),
-            result.isDiseaseFound ? `${texts.severity || 'Severity'}: ${currentText(result.severity)}` : '',
-            result.isDiseaseFound ? currentText(result.description) : (texts.healthyPlantDesc || 'No pathological disease detected.'),
-            result.isDiseaseFound && currentText(result.treatment?.medicineName) ? `${texts.treatment || 'Treatment'}: ${currentText(result.treatment.medicineName)}. ${currentTextArray(result.treatment?.usageInstructions).join('. ')}` : ''
-        ].filter(Boolean);
+        const exactText = currentText(result.description);
+        if (!exactText.trim()) return;
 
-        const fullReportText = reportSections.join('. ');
-        if (!fullReportText.trim()) return;
-
-        const utterance = new SpeechSynthesisUtterance(fullReportText);
+        const utterance = new SpeechSynthesisUtterance(exactText);
         utterance.lang = isKn ? 'kn-IN' : 'en-US';
 
         const voices = window.speechSynthesis.getVoices();
@@ -233,6 +265,7 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
     const symptomsList = currentTextArray(result.symptoms);
     const preventionList = currentTextArray(result.prevention);
     const instructionsList = currentTextArray(result.treatment?.usageInstructions);
+    const organicStepsList = currentTextArray(result.treatment?.organicSteps);
 
     return (
         <div className="space-y-6 text-neutral-100 font-sans printable-area">
@@ -266,6 +299,7 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
                             {currentText(result.diseaseName) || (isKn ? "ಆರೋಗ್ಯಕರ ಸಸ್ಯ" : "Healthy Plant")}
                         </h2>
 
+                        {/* Exact description text output by the model */}
                         <p className="text-sm text-neutral-300 leading-relaxed max-w-3xl">
                             {currentText(result.description) || (isKn ? "ಸಸ್ಯವು ರೋಗ ಲಕ್ಷಣಗಳಿಲ್ಲದೆ ಆರೋಗ್ಯಕರವಾಗಿದೆ." : "Plant shows normal physiological development with no active fungal or bacterial pathogens detected.")}
                         </p>
@@ -421,7 +455,7 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
                     )}
                 </div>
 
-                {/* Right Column: Prescriptions, Organic/Chemical Treatment Protocols */}
+                {/* Right Column: Prescriptions, Dynamic Organic/Chemical Treatment Protocols */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Treatment Selector Tabs */}
                     <div className="bg-neutral-900/80 border border-neutral-800 rounded-3xl p-6 backdrop-blur-xl shadow-xl">
@@ -454,36 +488,44 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
                             </button>
                         </div>
 
-                        {/* TAB 1: Organic Remedies */}
+                        {/* TAB 1: Dynamic Organic Remedies */}
                         {activeTreatmentTab === 'organic' && (
                             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
                                 <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-800/40 space-y-2">
                                     <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
                                         <Leaf className="w-4 h-4" />
-                                        <span>{isKn ? "ನೈಸರ್ಗಿಕ ಜೈವಿಕ ನಿಯಂತ್ರಣ" : "Biological & Botanical Formulations"}</span>
+                                        <span>
+                                            {isKn 
+                                                ? (isHealthy ? "ಸಾವಯವ ಪೋಷಣೆ ಮತ್ತು ಬೆಳೆ ಪಾಲನೆ" : "ನೈಸರ್ಗಿಕ ಜೈವಿಕ ನಿಯಂತ್ರಣ ಸೂತ್ರ") 
+                                                : (isHealthy ? "Organic Crop Nutrition & Soil Care" : "Biological & Botanical Management")}
+                                        </span>
                                     </div>
                                     <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
-                                        {currentText(result.treatment?.organicRemedy) || (isKn 
-                                            ? "ಬೇವು ಎಣ್ಣೆ (Neem Oil 5ml/L) ಅಥವಾ ಸೂಡೋಮೊನಾಸ್ ಫ್ಲೋರೆಸೆನ್ಸ್ (Pseudomonas fluorescens 10g/L) ದ್ರಾವಣವನ್ನು ಸಿಂಪಡಿಸಿ." 
-                                            : "Apply 5ml/L Neem Seed Kernel Extract (NSKE) or spray Trichoderma viride / Pseudomonas fluorescens at 10g/L for natural fungal containment.")}
+                                        {currentText(result.treatment?.organicRemedy) || (isHealthy
+                                            ? (isKn ? "ಬೆಳೆಯು ಆರೋಗ್ಯಕರವಾಗಿದೆ. ಬೇರಿನ ಶಕ್ತಿಗಾಗಿ ಎರೆಹುಳು ಗೊಬ್ಬರ ಮತ್ತು ತೇವಾಂಶ ಕಾಪಾಡಲು ಒಣ ಹುಲ್ಲಿನ ಮಲ್ಚಿಂಗ್ ಮಾಡಿ." : "Crop is healthy. Maintain root vigor with vermicompost top-dressing and organic mulching.")
+                                            : (isKn ? "ಜೈವಿಕ ಶಿಲೀಂಧ್ರನಾಶಕ ಅಥವಾ ಸೂಕ್ತ ನೈಸರ್ಗಿಕ ಕಷಾಯವನ್ನು ಸಿಂಪಡಿಸಿ." : "Apply target-specific bio-control agents or botanical extracts."))}
                                     </p>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <h5 className="text-xs font-mono uppercase text-neutral-400 tracking-wider">
-                                        {isKn ? "ಶಿಫಾರಸು ಮಾಡಲಾದ ಸಾವಯವ ಹಂತಗಳು:" : "Recommended Organic Steps:"}
-                                    </h5>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                        <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-xs text-neutral-300">
-                                            <span className="font-bold text-emerald-400 block mb-1">1. Neem Oil Spray</span>
-                                            {isKn ? "ಸಂಜೆ ವೇಳೆ 5ml ಬೇವಿನ ಎಣ್ಣೆಯನ್ನು 1 ಲೀಟರ್ ನೀರಿಗೆ ಬೆರೆಸಿ ಸಿಂಪಡಿಸಿ." : "Mix 5ml cold-pressed Neem Oil with 1ml liquid soap in 1L water; spray at sunset."}
-                                        </div>
-                                        <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-xs text-neutral-300">
-                                            <span className="font-bold text-emerald-400 block mb-1">2. Panchagavya Foliar</span>
-                                            {isKn ? "3% ಪಂಚಗವ್ಯ ದ್ರಾವಣವನ್ನು ಸಿಂಪಡಿಸಿ ಸಸ್ಯದ ರೋಗನಿರೋಧಕ ಶಕ್ತಿಯನ್ನು ಹೆಚ್ಚಿಸಿ." : "Apply 3% fermented Panchagavya solution to boost plant systemic immunity."}
+                                {organicStepsList.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h5 className="text-xs font-mono uppercase text-neutral-400 tracking-wider">
+                                            {isKn 
+                                                ? (isHealthy ? "ಶಿಫಾರಸು ಮಾಡಿದ ಸಾವಯವ ಪೋಷಣೆ ಕ್ರಮಗಳು:" : "ರೋಗ ನಿರ್ವಹಣೆಗೆ ಸಾವಯವ ಹಂತಗಳು:") 
+                                                : (isHealthy ? "Recommended Organic Nutrition Steps:" : "Disease-Specific Organic Steps:")}
+                                        </h5>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            {organicStepsList.map((step, idx) => (
+                                                <div key={idx} className="p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800 text-xs text-neutral-300 space-y-1">
+                                                    <span className="font-bold text-emerald-400 block">
+                                                        {isKn ? `ಕ್ರಮ ${idx + 1}` : `Step ${idx + 1}`}
+                                                    </span>
+                                                    <p className="leading-relaxed">{step}</p>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
-                                </div>
+                                )}
                             </motion.div>
                         )}
 
@@ -493,10 +535,14 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
                                 <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-800/40 space-y-2">
                                     <div className="flex items-center gap-2 text-blue-400 font-semibold text-sm">
                                         <FlaskConical className="w-4 h-4" />
-                                        <span>{isKn ? "ಶಿಫಾರಸು ಮಾಡಿದ ಔಷಧ" : "Prescribed Fungicide / Medicine"}</span>
+                                        <span>
+                                            {isKn ? "ಶಿಫಾರಸು ಮಾಡಿದ ಔಷಧ" : "Prescribed Chemical Treatment"}
+                                        </span>
                                     </div>
                                     <p className="text-base font-bold text-white">
-                                        {currentText(result.treatment?.medicineName) || (isKn ? "ಮ್ಯಾಂಕೋಜೆಬ್ ಅಥವಾ ಕಾಪರ್ ಆಕ್ಸಿಕ್ಲೋರೈಡ್" : "Mancozeb 75% WP or Copper Oxychloride 50% WP")}
+                                        {currentText(result.treatment?.medicineName) || (isHealthy 
+                                            ? (isKn ? "ಯಾವುದೇ ರಾಸಾಯನಿಕ ಔಷಧಿಯ ಅಗತ್ಯವಿಲ್ಲ" : "No chemical fungicides or pesticides required") 
+                                            : (isKn ? "ಸೂಕ್ತ ಶಿಲೀಂಧ್ರನಾಶಕ" : "Targeted Fungicide"))}
                                     </p>
                                 </div>
 
@@ -525,7 +571,7 @@ const PlantAnalysisResult: React.FC<PlantAnalysisResultProps> = ({
                             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
                                 <div className="space-y-2">
                                     <h5 className="text-xs font-mono uppercase text-neutral-400 tracking-wider">
-                                        {isKn ? "ರೋಗ ಹರಡುವಿಕೆ ತಡೆಗಟ್ಟುವ ಕ್ರಮಗಳು:" : "Field Prevention & Sanitization:"}
+                                        {isKn ? "ರೋಗ ಹರಡುವಿಕೆ ತಡೆಗಟ್ಟುವ ಕ್ರಮಗಳು:" : "Field Prevention & Cultural Hygiene:"}
                                     </h5>
                                     <div className="space-y-2">
                                         {preventionList.map((prev, idx) => (

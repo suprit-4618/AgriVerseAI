@@ -185,12 +185,6 @@ const PlantAnalysis: React.FC<PlantAnalysisProps> = ({
             {/* Top Lab Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-800/80 mb-6">
                 <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 font-bold">
-                            {isKn ? "ಕೃತಕ ಬುದ್ಧಿಮತ್ತೆ ಸಸ್ಯ ರೋಗಶಾಸ್ತ್ರ ಲ್ಯಾಬ್" : "AI Plant Pathology Diagnostic Lab"}
-                        </span>
-                    </div>
                     <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
                         {isKn ? "ಬೆಳೆ ರೋಗ ಪತ್ತೆ ಮತ್ತು ಪರಿಹಾರ" : "Crop Disease Diagnosis & Treatment"}
                     </h2>
