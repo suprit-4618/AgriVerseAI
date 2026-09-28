@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { LanguageProvider } from './context/LanguageContext';
+import { AuthProvider } from './context/AuthContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,7 +15,10 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <LanguageProvider>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </LanguageProvider>
   </React.StrictMode>
 );
+

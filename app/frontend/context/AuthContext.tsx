@@ -245,7 +245,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 updatePayload.location = location;
             }
 
-            await updateDoc(userDocRef, updatePayload);
+            await setDoc(userDocRef, updatePayload, { merge: true });
 
             setUser(prev => prev ? {
                 ...prev,

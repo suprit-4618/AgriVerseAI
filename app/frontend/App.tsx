@@ -219,6 +219,7 @@ const App: React.FC = () => {
                     onNavigate={setCurrentPage}
                     currentLanguage={currentLanguage}
                     setCurrentLanguage={setCurrentLanguage}
+                    onUpdateUser={handleUpdateUser}
                 />
             );
         }
@@ -234,6 +235,7 @@ const App: React.FC = () => {
                     onNavigate={setCurrentPage}
                     currentLanguage={currentLanguage}
                     setCurrentLanguage={setCurrentLanguage}
+                    onUpdateUser={handleUpdateUser}
                 />
             );
         }

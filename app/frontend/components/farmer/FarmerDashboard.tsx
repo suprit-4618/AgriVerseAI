@@ -42,6 +42,7 @@ interface FarmerDashboardProps {
     onNavigate?: (page: string) => void;
     currentLanguage?: Language;
     setCurrentLanguage?: (lang: Language) => void;
+    onUpdateUser?: (updated: UserProfile) => void;
 }
 
 type FarmerTab = 'overview' | 'diagnostics' | 'assistant' | 'soil_weather' | 'marketplace' | 'schemes' | 'profile';
@@ -49,6 +50,7 @@ type FarmerTab = 'overview' | 'diagnostics' | 'assistant' | 'soil_weather' | 'ma
 export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
     user,
     onLogout,
+    onUpdateUser,
 }) => {
     const { language: activeLanguage, setLanguage: setActiveLanguage, texts, farmerTexts: t, isKannada } = useLanguage();
 
@@ -379,6 +381,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                             {activeTab === 'soil_weather' && t.header.soilWeather}
                             {activeTab === 'marketplace' && t.header.marketplace}
                             {activeTab === 'schemes' && t.header.schemes}
+                            {activeTab === 'profile' && (isKannada ? 'ವ್ಯಾಪಾರ ವಿವರ ಮತ್ತು ಪ್ರೊಫೈಲ್' : 'Business & Farm Profile')}
                         </h1>
                     </div>
 
@@ -1122,7 +1125,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -8 }}
                             >
-                                <FarmerProfileView user={user} isKannada={isKannada} />
+                                <FarmerProfileView user={user} isKannada={isKannada} onUpdateUser={onUpdateUser} />
                             </motion.div>
                         )}
 

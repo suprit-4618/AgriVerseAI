@@ -69,6 +69,26 @@ export const BuyerProfileView: React.FC<BuyerProfileViewProps> = ({ user, isKann
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
 
+    // Sync form fields when user object changes or loads
+    React.useEffect(() => {
+        if (user) {
+            setCompanyName(user.details?.companyName || 'Verified Mandi Trader');
+            setFullName(user.fullName || '');
+            if (user.details?.traderType) setTraderType(user.details.traderType);
+            setLicenseNumber(user.details?.licenseNumber || '');
+            setGstNumber(user.details?.gstNumber || '');
+            setPanNumber(user.details?.panNumber || '');
+            if (user.details?.mandiLocation) setMandiLocation(user.details.mandiLocation);
+            setBusinessAddress(user.details?.businessAddress || '');
+            setPincode(user.details?.pincode || '');
+            setPhone(user.details?.phone || user.phone || '');
+            if (user.details?.monthlyProcurementCapacity) setCapacity(user.details.monthlyProcurementCapacity);
+            if (user.details?.preferredCrops && user.details.preferredCrops.length > 0) {
+                setPreferredCrops(user.details.preferredCrops);
+            }
+        }
+    }, [user]);
+
     const toggleCrop = (crop: string) => {
         setPreferredCrops(prev => 
             prev.includes(crop) ? prev.filter(c => c !== crop) : [...prev, crop]
@@ -98,21 +118,31 @@ export const BuyerProfileView: React.FC<BuyerProfileViewProps> = ({ user, isKann
 
             const locationString = `${mandiLocation.split('(')[0].trim()}, Karnataka`;
 
-            await updateProfileDetails(detailsPayload, fullName.trim(), locationString);
+            // 1. Direct Firestore Persistence
             await userService.updateUserProfile(user.id, {
                 fullName: fullName.trim(),
                 phone: phone.trim(),
                 location: locationString,
-                details: { ...user.details, ...detailsPayload }
+                details: { ...(user.details || {}), ...detailsPayload }
             });
 
+            // 2. AuthContext state synchronization
+            if (updateProfileDetails) {
+                try {
+                    await updateProfileDetails(detailsPayload, fullName.trim(), locationString);
+                } catch (ctxErr) {
+                    console.warn("AuthContext sync notice:", ctxErr);
+                }
+            }
+
+            // 3. Parent View State update
             if (onUpdateUser) {
                 onUpdateUser({
                     ...user,
                     fullName: fullName.trim(),
                     phone: phone.trim(),
                     location: locationString,
-                    details: { ...user.details, ...detailsPayload }
+                    details: { ...(user.details || {}), ...detailsPayload }
                 });
             }
 

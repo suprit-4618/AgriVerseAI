@@ -32,6 +32,7 @@ interface BuyerDashboardProps {
     onNavigate?: (page: string) => void;
     currentLanguage?: Language;
     setCurrentLanguage?: (lang: Language) => void;
+    onUpdateUser?: (updated: UserProfile) => void;
 }
 
 type BuyerTab = 'overview' | 'marketplace' | 'mandi_rates' | 'orders' | 'profile';
@@ -39,6 +40,7 @@ type BuyerTab = 'overview' | 'marketplace' | 'mandi_rates' | 'orders' | 'profile
 export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
     user,
     onLogout,
+    onUpdateUser,
 }) => {
     const { language: activeLanguage, setLanguage: setActiveLanguage, texts, buyerTexts: t, isKannada } = useLanguage();
 
@@ -298,6 +300,7 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                             {activeTab === 'marketplace' && t.header.marketplace}
                             {activeTab === 'mandi_rates' && t.header.mandiRates}
                             {activeTab === 'orders' && t.header.orders}
+                            {activeTab === 'profile' && (isKannada ? 'ವ್ಯಾಪಾರ ವಿವರ ಮತ್ತು ಪ್ರೊಫೈಲ್' : 'Mandi Business Profile')}
                         </h1>
                     </div>
 
@@ -723,7 +726,7 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -8 }}
                             >
-                                <BuyerProfileView user={user} isKannada={isKannada} />
+                                <BuyerProfileView user={user} isKannada={isKannada} onUpdateUser={onUpdateUser} />
                             </motion.div>
                         )}
 

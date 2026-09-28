@@ -69,6 +69,30 @@ export const FarmerProfileView: React.FC<FarmerProfileViewProps> = ({ user, isKa
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
 
+    // Sync form fields when user object changes or loads
+    React.useEffect(() => {
+        if (user) {
+            setFullName(user.fullName || '');
+            setPhone(user.details?.phone || user.phone || '');
+            setVillage(user.details?.village || '');
+            setTaluk(user.details?.taluk || '');
+            setDistrict(user.details?.district || 'Dharwad');
+            setPincode(user.details?.pincode || '');
+            setFarmName(user.details?.farmName || '');
+            setFarmSize(user.details?.farmSize || '');
+            if (user.details?.soilType) setSoilType(user.details.soilType);
+            if (user.details?.irrigationType) setIrrigationType(user.details.irrigationType);
+            if (user.details?.mainCrops && user.details.mainCrops.length > 0) {
+                setSelectedCrops(user.details.mainCrops);
+            }
+            setKisanId(user.details?.kisanId || '');
+            setBankName(user.details?.bankName || '');
+            setBankAccount(user.details?.bankAccount || '');
+            setBankIfsc(user.details?.bankIfsc || '');
+            setUpiId(user.details?.upiId || '');
+        }
+    }, [user]);
+
     const toggleCrop = (crop: string) => {
         setSelectedCrops(prev => 
             prev.includes(crop) ? prev.filter(c => c !== crop) : [...prev, crop]
@@ -103,21 +127,31 @@ export const FarmerProfileView: React.FC<FarmerProfileViewProps> = ({ user, isKa
 
             const locationString = `${village ? village + ', ' : ''}${district}, Karnataka`;
 
-            await updateProfileDetails(detailsPayload, fullName.trim(), locationString);
+            // 1. Direct Firestore Persistence
             await userService.updateUserProfile(user.id, {
                 fullName: fullName.trim(),
                 phone: phone.trim(),
                 location: locationString,
-                details: { ...user.details, ...detailsPayload }
+                details: { ...(user.details || {}), ...detailsPayload }
             });
 
+            // 2. AuthContext state synchronization
+            if (updateProfileDetails) {
+                try {
+                    await updateProfileDetails(detailsPayload, fullName.trim(), locationString);
+                } catch (ctxErr) {
+                    console.warn("AuthContext sync notice:", ctxErr);
+                }
+            }
+
+            // 3. Parent View State update
             if (onUpdateUser) {
                 onUpdateUser({
                     ...user,
                     fullName: fullName.trim(),
                     phone: phone.trim(),
                     location: locationString,
-                    details: { ...user.details, ...detailsPayload }
+                    details: { ...(user.details || {}), ...detailsPayload }
                 });
             }
 
