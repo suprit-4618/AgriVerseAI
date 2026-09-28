@@ -61,6 +61,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
     const [isSellModalOpen, setIsSellModalOpen] = useState(false);
     const [sellPrefill, setSellPrefill] = useState<{ crop?: string; district?: string; price?: number }>({});
     const [selectedRequest, setSelectedRequest] = useState<CropSellRequest | null>(null);
+    const [activeBuyerId, setActiveBuyerId] = useState<string | null>(null);
     const [chatInput, setChatInput] = useState('');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -77,6 +78,12 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
         const unsubRequests = marketService.subscribeFarmerRequests(user.id, (data) => {
             setSellRequests(data);
             setIsLoadingRequests(false);
+            // Sync active negotiation request if open
+            setSelectedRequest((curr) => {
+                if (!curr) return null;
+                const updated = data.find(r => r.id === curr.id);
+                return updated || curr;
+            });
         });
 
         const unsubOrders = orderService.subscribeFarmerOrders(user.id, (data) => {
@@ -99,21 +106,97 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
         };
     }, [user.id]);
 
-    const handleSendMessage = async () => {
-        if (!selectedRequest || !chatInput.trim()) return;
+    // Segment messages by distinct buyers (WhatsApp style threads)
+    const buyerThreads = useMemo(() => {
+        if (!selectedRequest?.messages || selectedRequest.messages.length === 0) return [];
+        const threadMap = new Map<string, {
+            buyerId: string;
+            buyerName: string;
+            lastMessage: RequestMessage;
+            latestOffer?: number;
+            messageCount: number;
+        }>();
+
+        selectedRequest.messages.forEach(msg => {
+            const bId = msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== user.id ? msg.senderId : 'general_buyer'));
+            const bName = msg.buyerName || (msg.senderRole === 'BUYER' ? msg.senderName : (msg.senderId !== user.id ? msg.senderName : 'Verified Mandi Trader'));
+            
+            let offer = msg.priceOffer;
+            if (!offer && typeof msg.text === 'string') {
+                const numMatch = msg.text.match(/(?:₹|rs\.?|rate|price|offer)?\s*(\d{3,6})/i);
+                if (numMatch && numMatch[1]) {
+                    const parsed = parseInt(numMatch[1], 10);
+                    if (parsed >= 100 && parsed <= 500000) offer = parsed;
+                }
+            }
+
+            const prev = threadMap.get(bId);
+            threadMap.set(bId, {
+                buyerId: bId,
+                buyerName: bName,
+                lastMessage: msg,
+                latestOffer: offer || prev?.latestOffer,
+                messageCount: (prev?.messageCount || 0) + 1
+            });
+        });
+
+        return Array.from(threadMap.values());
+    }, [selectedRequest, user.id]);
+
+    // Auto-select first active buyer thread
+    useEffect(() => {
+        if (selectedRequest && buyerThreads.length > 0) {
+            if (!activeBuyerId || !buyerThreads.some(b => b.buyerId === activeBuyerId)) {
+                setActiveBuyerId(buyerThreads[0].buyerId);
+            }
+        }
+    }, [selectedRequest, buyerThreads, activeBuyerId]);
+
+    const activeBuyerInfo = useMemo(() => {
+        return buyerThreads.find(b => b.buyerId === activeBuyerId) || buyerThreads[0] || null;
+    }, [buyerThreads, activeBuyerId]);
+
+    const currentThreadMessages = useMemo(() => {
+        if (!selectedRequest?.messages) return [];
+        if (buyerThreads.length === 0) return selectedRequest.messages;
+        const targetBuyerId = activeBuyerId || buyerThreads[0]?.buyerId;
+        return selectedRequest.messages.filter(msg => {
+            const bId = msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== user.id ? msg.senderId : 'general_buyer'));
+            return bId === targetBuyerId;
+        });
+    }, [selectedRequest, activeBuyerId, buyerThreads, user.id]);
+
+    const handleSendMessage = async (customText?: string) => {
+        const textToSend = customText || chatInput;
+        if (!selectedRequest || !textToSend.trim()) return;
         try {
+            const targetBuyer = activeBuyerInfo;
             const msg = await marketService.addMessage(selectedRequest.id, {
                 senderId: user.id,
                 senderName: user.fullName || (activeLanguage === Language.KN ? 'ರೈತರು' : 'Farmer'),
-                text: chatInput
+                senderRole: 'FARMER',
+                buyerId: targetBuyer?.buyerId || undefined,
+                buyerName: targetBuyer?.buyerName || undefined,
+                text: textToSend.trim()
             });
             setSelectedRequest({
                 ...selectedRequest,
                 messages: [...(selectedRequest.messages || []), msg]
             });
-            setChatInput('');
+            if (!customText) setChatInput('');
         } catch (err) {
             console.error("Error sending message:", err);
+        }
+    };
+
+    const handleApproveBuyerDeal = async (rate: number, buyerId: string, buyerName: string) => {
+        if (!selectedRequest) return;
+        try {
+            await marketService.updateStatus(selectedRequest.id, 'APPROVED', rate, buyerId, buyerName);
+            setSelectedRequest(null);
+            setActiveBuyerId(null);
+        } catch (err) {
+            console.error("Error approving deal:", err);
         }
     };
 
@@ -1002,76 +1085,227 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                 }}
             />
 
-            {/* 4. Negotiation Chat Modal with Mandi Buyers */}
+            {/* 4. WhatsApp-Style Segmented Negotiation Chat Modal with Mandi Buyers */}
             {selectedRequest && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 font-sans">
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
+                        initial={{ opacity: 0, scale: 0.96 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-neutral-950 border border-neutral-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[600px]"
+                        exit={{ opacity: 0, scale: 0.96 }}
+                        className="bg-neutral-950 border border-neutral-800 rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col md:flex-row h-[650px] max-h-[92vh]"
                     >
-                        <div className="p-4 border-b border-neutral-900 flex justify-between items-center bg-neutral-900/40">
-                            <div>
-                                <h3 className="text-sm font-bold uppercase text-white font-mono">
-                                    {t.negotiationModal.title} • {selectedRequest.cropName}
-                                </h3>
-                                <p className="text-[10px] text-neutral-400 font-mono">
-                                    {selectedRequest.quantity} {t.overviewTab.quintalsUnit} • {t.negotiationModal.expected}: ₹{selectedRequest.expectedPrice}/Q
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setSelectedRequest(null)}
-                                className="text-neutral-500 hover:text-white p-1"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                            {(!selectedRequest.messages || selectedRequest.messages.length === 0) ? (
-                                <div className="text-center text-neutral-600 font-mono text-xs my-auto pt-20">
-                                    {t.negotiationModal.noMessages}
+                        {/* LEFT COLUMN: BUYER THREADS LIST (WHATSAPP-STYLE) */}
+                        <div className="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-neutral-900 flex flex-col bg-neutral-950 shrink-0">
+                            {/* Header */}
+                            <div className="p-4 border-b border-neutral-900 bg-neutral-900/40">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-bold">
+                                        {isKannada ? "ಖರೀದಿದಾರರ ಮಾತುಕತೆ" : "Buyer Inquiries"}
+                                    </span>
+                                    <span className="text-[10px] font-mono bg-white text-black px-2 py-0.5 rounded-full font-bold">
+                                        {buyerThreads.length} {isKannada ? "ಬಿಡ್ಸ್‌" : "Active"}
+                                    </span>
                                 </div>
-                            ) : (
-                                selectedRequest.messages.map((msg, i) => {
-                                    const isMe = msg.senderId === user.id;
-                                    return (
-                                        <div
-                                            key={i}
-                                            className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                                        >
-                                            <div className="text-[10px] font-mono text-neutral-500 mb-1">
-                                                {msg.senderName}
-                                            </div>
-                                            <div className={`p-3 rounded-xl max-w-xs text-xs font-mono ${
-                                                isMe 
-                                                    ? 'bg-white text-black' 
-                                                    : 'bg-neutral-900 text-white border border-neutral-800'
-                                            }`}>
-                                                {msg.text}
-                                            </div>
+                                {/* Harvest summary pill */}
+                                <div className="p-2.5 bg-neutral-900 rounded-xl border border-neutral-800 flex items-center justify-between">
+                                    <div>
+                                        <div className="text-xs font-bold text-white font-mono uppercase">{selectedRequest.cropName}</div>
+                                        <div className="text-[10px] text-neutral-400 font-mono">{selectedRequest.quantity} Qtl • Asking: ₹{selectedRequest.expectedPrice}/Q</div>
+                                    </div>
+                                    <span className="text-[9px] font-mono uppercase font-bold px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
+                                        {selectedRequest.status}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Buyer List Scroll Area */}
+                            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
+                                {buyerThreads.length === 0 ? (
+                                    <div className="p-6 text-center text-neutral-500 font-mono text-xs my-auto">
+                                        <div className="w-10 h-10 rounded-full bg-neutral-900 text-neutral-400 flex items-center justify-center mx-auto mb-2 text-sm">
+                                            💬
                                         </div>
-                                    );
-                                })
-                            )}
+                                        <p className="font-bold text-neutral-400 mb-1">{isKannada ? "ಯಾವುದೇ ಬಿಡ್‌ಗಳಿಲ್ಲ" : "No Buyer Inquiries Yet"}</p>
+                                        <p className="text-[10px] text-neutral-600 leading-relaxed">
+                                            {isKannada ? "ಮಾರುಕಟ್ಟೆ ವ್ಯಾಪಾರಿಗಳು ಆಫರ್ ನೀಡಿದ ತಕ್ಷಣ ಇಲ್ಲಿ ಪ್ರತ್ಯೇಕವಾಗಿ ಕಾಣಿಸುತ್ತದೆ." : "Offers from APMC verified traders will appear here in dedicated 1-on-1 channels."}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    buyerThreads.map((thread) => {
+                                        const isSelected = activeBuyerId === thread.buyerId;
+                                        return (
+                                            <button
+                                                key={thread.buyerId}
+                                                type="button"
+                                                onClick={() => setActiveBuyerId(thread.buyerId)}
+                                                className={`w-full text-left p-3 rounded-xl transition-all flex items-start gap-3 border ${
+                                                    isSelected 
+                                                        ? 'bg-neutral-900 border-neutral-700 text-white shadow-lg' 
+                                                        : 'bg-neutral-950/40 border-transparent hover:bg-neutral-900/60 text-neutral-400'
+                                                }`}
+                                            >
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-mono font-bold shrink-0 ${
+                                                    isSelected ? 'bg-white text-black' : 'bg-neutral-800 text-neutral-300'
+                                                }`}>
+                                                    {thread.buyerName.slice(0, 2).toUpperCase()}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-baseline mb-0.5">
+                                                        <span className="text-xs font-bold text-white truncate">{thread.buyerName}</span>
+                                                        {thread.lastMessage?.timestamp && (
+                                                            <span className="text-[9px] font-mono text-neutral-500 shrink-0">
+                                                                {new Date(thread.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400">
+                                                        <p className="truncate mr-1 text-[11px]">{thread.lastMessage?.text || 'Sent an offer'}</p>
+                                                        {thread.latestOffer && (
+                                                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-900 shrink-0">
+                                                                ₹{thread.latestOffer}/Q
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
                         </div>
 
-                        <div className="p-3 border-t border-neutral-900 flex gap-2 bg-neutral-950">
-                            <input
-                                type="text"
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                placeholder={t.negotiationModal.placeholder}
-                                className="flex-1 bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none"
-                            />
-                            <button
-                                onClick={handleSendMessage}
-                                className="bg-white text-black font-mono font-bold text-xs uppercase px-4 py-2 rounded-xl hover:bg-neutral-200 transition-all"
-                            >
-                                {t.negotiationModal.sendBtn}
-                            </button>
+                        {/* RIGHT COLUMN: ACTIVE 1-ON-1 CONVERSATION & DEAL CLOSING */}
+                        <div className="flex-1 flex flex-col bg-neutral-950 h-full overflow-hidden">
+                            {/* Chat Top Header */}
+                            <div className="p-4 border-b border-neutral-900 flex justify-between items-center bg-neutral-900/30">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-neutral-800 border border-neutral-700 text-white flex items-center justify-center font-mono font-bold text-xs">
+                                        {activeBuyerInfo?.buyerName?.slice(0, 2).toUpperCase() || 'TR'}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-sm font-bold uppercase text-white font-mono">
+                                                {activeBuyerInfo?.buyerName || (isKannada ? "ವ್ಯಾಪಾರಿಗಳ ಮಾತುಕತೆ" : "Mandi Buyer Negotiation")}
+                                            </h3>
+                                            <span className="text-[9px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                                                {isKannada ? "ಪರಿಶೀಲಿತ ವ್ಯಾಪಾರಿ" : "Verified Trader"}
+                                            </span>
+                                        </div>
+                                        <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                                            {selectedRequest.cropName} • {selectedRequest.quantity} {t.overviewTab.quintalsUnit} • {isKannada ? "ರೈತರ ದರ:" : "Your Asking:"} ₹{selectedRequest.expectedPrice}/Q
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                    {activeBuyerInfo?.latestOffer && selectedRequest.status !== 'APPROVED' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleApproveBuyerDeal(activeBuyerInfo.latestOffer!, activeBuyerInfo.buyerId, activeBuyerInfo.buyerName)}
+                                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-bold text-[11px] uppercase tracking-wider px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5"
+                                        >
+                                            <span>{isKannada ? "ಖರೀದಿ ಒಪ್ಪಿಕೊಳ್ಳಿ (Accept)" : "Accept Deal"} ₹{activeBuyerInfo.latestOffer}/Q</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => {
+                                            setSelectedRequest(null);
+                                            setActiveBuyerId(null);
+                                        }}
+                                        className="text-neutral-500 hover:text-white p-1.5 rounded-lg font-mono text-sm transition-colors"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Messages Stream */}
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 custom-scrollbar bg-neutral-950/60">
+                                {currentThreadMessages.length === 0 ? (
+                                    <div className="text-center text-neutral-500 font-mono text-xs my-auto pt-24">
+                                        <p className="font-bold text-neutral-400 mb-1">{t.negotiationModal.noMessages}</p>
+                                        <p className="text-[11px] text-neutral-600">
+                                            {isKannada ? "ನೀವು ಕೆಳಗೆ ನಿಮ್ಮ ಆಫರ್ ಅಥವಾ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಬಹುದು." : "You can send an initial message or counter-offer below."}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    currentThreadMessages.map((msg, i) => {
+                                        const isMe = msg.senderId === user.id || msg.senderRole === 'FARMER';
+                                        return (
+                                            <div
+                                                key={i}
+                                                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                                            >
+                                                <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 mb-1">
+                                                    <span>{msg.senderName}</span>
+                                                    {msg.senderRole && (
+                                                        <span className={`px-1 py-0.2 rounded text-[8px] uppercase font-bold ${
+                                                            isMe ? 'bg-neutral-800 text-neutral-300' : 'bg-emerald-950 text-emerald-400 border border-emerald-900'
+                                                        }`}>
+                                                            {msg.senderRole}
+                                                        </span>
+                                                    )}
+                                                    {msg.timestamp && (
+                                                        <span className="text-[9px] text-neutral-600">
+                                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className={`p-3.5 rounded-2xl max-w-sm sm:max-w-md text-xs font-mono leading-relaxed shadow-sm ${
+                                                    isMe 
+                                                        ? 'bg-white text-black font-medium rounded-tr-sm' 
+                                                        : 'bg-neutral-900 text-neutral-100 border border-neutral-800 rounded-tl-sm'
+                                                }`}>
+                                                    {msg.text}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            {/* Quick Counter Chips */}
+                            {selectedRequest.expectedPrice && (
+                                <div className="px-4 py-2 bg-neutral-950 border-t border-neutral-900 flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
+                                    <span className="text-[10px] font-mono text-neutral-500 shrink-0 uppercase">
+                                        {isKannada ? "ತ್ವರಿತ ಕೌಂಟರ್:" : "Quick Counter:"}
+                                    </span>
+                                    {[
+                                        `₹${selectedRequest.expectedPrice}/Q (Firm)`,
+                                        `₹${selectedRequest.expectedPrice - 50}/Q`,
+                                        `₹${selectedRequest.expectedPrice + 100}/Q`,
+                                        isKannada ? "ಇಂದೇ ಲೋಡಿಂಗ್ ಲಭ್ಯವಿದೆ" : "Immediate dispatch ready"
+                                    ].map((chipText, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => handleSendMessage(chipText)}
+                                            className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white transition-all whitespace-nowrap shrink-0"
+                                        >
+                                            {chipText}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Chat Footer Input */}
+                            <div className="p-3.5 border-t border-neutral-900 flex gap-2 bg-neutral-950">
+                                <input
+                                    type="text"
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                    placeholder={isKannada ? "ಪ್ರತ್ಯುತ್ತರ ಅಥವಾ ಹೊಸ ದರವನ್ನು ಟೈಪ್ ಮಾಡಿ..." : "Type reply, delivery terms or counter-rate (e.g. ₹7,450/Q)..."}
+                                    className="flex-1 bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none transition-all placeholder:text-neutral-600"
+                                />
+                                <button
+                                    onClick={() => handleSendMessage()}
+                                    disabled={!chatInput.trim()}
+                                    className="bg-white text-black font-mono font-bold text-xs uppercase px-5 py-2.5 rounded-xl hover:bg-neutral-200 transition-all shadow-md disabled:opacity-40"
+                                >
+                                    {t.negotiationModal.sendBtn}
+                                </button>
+                            </div>
                         </div>
                     </motion.div>
                 </div>

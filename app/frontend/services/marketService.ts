@@ -172,25 +172,31 @@ export const marketService = {
            const requestDoc = await getDoc(docRef);
            if (!requestDoc.exists()) throw new Error("Request not found");
            
-           const newMessage = {
+           const reqData = requestDoc.data();
+           const buyerId = message.buyerId || (message.senderRole === 'BUYER' ? message.senderId : undefined);
+           const buyerName = message.buyerName || (message.senderRole === 'BUYER' ? message.senderName : undefined);
+
+           const newMessage: RequestMessage = {
                ...message,
+               buyerId,
+               buyerName,
                id: `msg_${Date.now()}`,
                timestamp: new Date().toISOString()
            };
            
-           const currentMessages = requestDoc.data()?.messages || [];
+           const currentMessages = reqData?.messages || [];
            await updateDoc(docRef, { 
                messages: [...currentMessages, newMessage],
                status: 'NEGOTIATING'
            });
 
-           // Notify recipient
-           const reqData = requestDoc.data();
-           const recipientId = message.senderId === reqData.farmerId ? 'all_buyers' : reqData.farmerId;
+           // Notify targeted recipient
+           const isFarmer = message.senderId === reqData.farmerId || message.senderRole === 'FARMER';
+           const recipientId = isFarmer ? (buyerId || 'all_buyers') : reqData.farmerId;
            try {
                await notificationService.createNotification({
                    recipientId,
-                   title: `New Offer on ${reqData.cropName}`,
+                   title: isFarmer ? `Farmer Reply on ${reqData.cropName}` : `New Offer on ${reqData.cropName}`,
                    message: `${message.senderName}: "${message.text}"`,
                    type: 'info'
                });

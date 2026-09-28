@@ -418,7 +418,11 @@ export interface RequestMessage {
     id: string;
     senderId: string;
     senderName: string;
+    senderRole?: 'FARMER' | 'BUYER' | 'ADMIN';
+    buyerId?: string; // Links message to a specific buyer negotiation thread
+    buyerName?: string;
     text: string;
+    priceOffer?: number;
     timestamp: string;
 }
 
