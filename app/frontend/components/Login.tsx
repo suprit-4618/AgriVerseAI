@@ -278,7 +278,19 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 }
             }
         } catch (error: any) {
-            setStatusMessage({ type: 'error', text: error.message || 'Google sign-in was cancelled or failed.' });
+            console.error('Google Sign-In Error:', error);
+            if (error.code === 'auth/unauthorized-domain') {
+                setStatusMessage({ 
+                    type: 'error', 
+                    text: isKannada 
+                        ? 'ಗೂಗಲ್ ಲಾಗಿನ್ ಡೊಮೇನ್ ದೃಢೀಕರಿಸಲಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಕೆಳಗಿನ ಇಮೇಲ್/ಪಾಸ್‌ವರ್ಡ್ ಬಳಸಿ ಲಾಗಿನ್ ಮಾಡಿ.' 
+                        : 'Google Sign-In domain not authorized in Firebase. Please sign in below using your Email & Password.' 
+                });
+            } else if (error.code === 'auth/popup-closed-by-user') {
+                setStatusMessage(null);
+            } else {
+                setStatusMessage({ type: 'error', text: error.message || 'Google sign-in was cancelled or failed.' });
+            }
         }
     };
 
