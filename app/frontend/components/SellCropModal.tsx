@@ -60,12 +60,13 @@ const SellCropModal: React.FC<SellCropModalProps> = ({
         return 'Haveri, Karnataka';
     };
 
-    // Form Data
     const [category, setCategory] = useState<CropCategory>('Yields');
     const [selectedCrop, setSelectedCrop] = useState<string>(initialCrop || 'Cotton');
     const [quantity, setQuantity] = useState<string>('');
     const [expectedPrice, setExpectedPrice] = useState<string>(initialPrice ? initialPrice.toString() : '');
-    const [selectedMarket, setSelectedMarket] = useState<string>(initialDistrict ? `${initialDistrict} APMC` : (karnatakaMarkets[0] || 'Haveri APMC'));
+    const [selectedMarket, setSelectedMarket] = useState<string>(
+        initialDistrict ? `${initialDistrict} APMC` : (karnatakaMarkets[0]?.name || 'Haveri APMC')
+    );
     const [districtLocation, setDistrictLocation] = useState<string>(getInitialDistrictLocation);
     const [error, setError] = useState<string | null>(null);
 
@@ -295,11 +296,14 @@ const SellCropModal: React.FC<SellCropModalProps> = ({
                                         onChange={(e) => setSelectedMarket(e.target.value)}
                                         className="w-full bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none transition-all"
                                     >
-                                        {karnatakaMarkets.map((m) => (
-                                            <option key={m} value={m} className="bg-neutral-900 text-white">
-                                                {m}
-                                            </option>
-                                        ))}
+                                        {karnatakaMarkets.map((m) => {
+                                            const marketName = typeof m === 'string' ? m : m.name;
+                                            return (
+                                                <option key={marketName} value={marketName} className="bg-neutral-900 text-white">
+                                                    {marketName}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
 
