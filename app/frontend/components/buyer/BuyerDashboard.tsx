@@ -678,150 +678,225 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                 </main>
             </div>
 
-            {/* 3. Negotiation Modal with Farmer (1-on-1 Private Channel) */}
+            {/* 3. Negotiation Modal with Farmer (WhatsApp-Style Dual Pane) */}
             {selectedRequest && (
                 <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 font-sans">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.96 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.96 }}
-                        className="bg-neutral-950 border border-neutral-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[650px] max-h-[92vh]"
+                        className="bg-neutral-950 border border-neutral-800 rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col md:flex-row h-[650px] max-h-[92vh]"
                     >
-                        {/* Modal Header */}
-                        <div className="p-4 sm:p-5 border-b border-neutral-900 bg-neutral-900/40 flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-2xl bg-white text-black flex items-center justify-center font-mono font-bold text-sm shrink-0">
-                                    {selectedRequest.farmerName ? selectedRequest.farmerName.slice(0, 2).toUpperCase() : 'FM'}
+                        {/* LEFT COLUMN: FARMER HARVESTS LIST (WHATSAPP-STYLE) */}
+                        <div className="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-neutral-900 flex flex-col bg-neutral-950 shrink-0">
+                            {/* Header */}
+                            <div className="p-4 border-b border-neutral-900 bg-neutral-900/40">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-bold">
+                                        {isKannada ? "ರೈತರ ಪಟ್ಟಿ ಮತ್ತು ಬೆಳೆಗಳು" : "Cultivator Inquiries"}
+                                    </span>
+                                    <span className="text-[10px] font-mono bg-white text-black px-2 py-0.5 rounded-full font-bold">
+                                        {allRequests.length} {isKannada ? "ಬೆಳೆಗಳು" : "Batches"}
+                                    </span>
                                 </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-bold uppercase text-white font-mono">
-                                            {selectedRequest.farmerName || (isKannada ? "ದೃಢೀಕರಿಸಿದ ರೈತರು" : "Verified Cultivator")}
-                                        </h3>
-                                        <span className="text-[9px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                                            {isKannada ? "ನೇರ ಬೆಳೆಗಾರ" : "Direct Producer"}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
-                                        {selectedRequest.cropName} • <strong className="text-white">{selectedRequest.quantity} {t.overviewTab.quintalsUnit}</strong> • {t.negotiationModal.farmerAsking}: <strong className="text-emerald-400">₹{selectedRequest.expectedPrice}/Q</strong>
-                                    </p>
+                                <div className="text-[10px] text-neutral-500 font-mono">
+                                    {isKannada ? "ಸಂವಾದ ನಡೆಸಲು ಬೆಳೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ" : "Select a farmer lot to negotiate directly"}
                                 </div>
                             </div>
-                            <button
-                                onClick={() => setSelectedRequest(null)}
-                                className="text-neutral-500 hover:text-white p-1.5 rounded-lg font-mono text-sm transition-colors"
-                            >
-                                ✕
-                            </button>
-                        </div>
 
-                        {/* Messages Area (Filtered strictly to this buyer's thread) */}
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 custom-scrollbar bg-neutral-950/60">
-                            {(!selectedRequest.messages || selectedRequest.messages.length === 0) ? (
-                                <div className="text-center text-neutral-500 font-mono text-xs my-auto pt-24">
-                                    <div className="w-10 h-10 rounded-full bg-neutral-900 text-neutral-400 flex items-center justify-center mx-auto mb-2 text-sm">
-                                        💬
+                            {/* Farmer Harvests List Scroll Area */}
+                            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
+                                {allRequests.length === 0 ? (
+                                    <div className="p-6 text-center text-neutral-500 font-mono text-xs my-auto">
+                                        <p>{isKannada ? "ಯಾವುದೇ ಸಕ್ರಿಯ ಬೆಳೆಗಳಿಲ್ಲ" : "No active harvest listings"}</p>
                                     </div>
-                                    <p className="font-bold text-neutral-400 mb-1">{t.negotiationModal.noMessages}</p>
-                                    <p className="text-[11px] text-neutral-600">
-                                        {isKannada ? "ರೈತರಿಗೆ ನಿಮ್ಮ ದರ ಅಥವಾ ಖರೀದಿಯ ನಿಯಮಗಳನ್ನು ಕೆಳಗೆ ಕಳುಹಿಸಿ." : "Send an initial bid or counter-offer to the farmer below."}
-                                    </p>
-                                </div>
-                            ) : (
-                                selectedRequest.messages
-                                    .filter(msg => msg.buyerId === user.id || msg.senderId === user.id || (!msg.buyerId && (msg.senderId === selectedRequest.farmerId || msg.senderRole === 'FARMER')))
-                                    .map((msg, i) => {
-                                        const isMe = msg.senderId === user.id || msg.senderRole === 'BUYER';
+                                ) : (
+                                    allRequests.map((req) => {
+                                        const isSelected = selectedRequest.id === req.id;
+                                        const lastMsg = req.messages && req.messages.length > 0 ? req.messages[req.messages.length - 1] : null;
                                         return (
-                                            <div
-                                                key={i}
-                                                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                                            <button
+                                                key={req.id}
+                                                type="button"
+                                                onClick={() => setSelectedRequest(req)}
+                                                className={`w-full text-left p-3 rounded-xl transition-all flex items-start gap-3 border ${
+                                                    isSelected 
+                                                        ? 'bg-neutral-900 border-neutral-700 text-white shadow-lg' 
+                                                        : 'bg-neutral-950/40 border-transparent hover:bg-neutral-900/60 text-neutral-400'
+                                                }`}
                                             >
-                                                <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 mb-1">
-                                                    <span>{msg.senderName}</span>
-                                                    <span className={`px-1.5 py-0.2 rounded text-[8px] uppercase font-bold ${
-                                                        isMe ? 'bg-neutral-800 text-neutral-300' : 'bg-emerald-950 text-emerald-400 border border-emerald-900'
-                                                    }`}>
-                                                        {msg.senderRole || (isMe ? 'BUYER' : 'FARMER')}
-                                                    </span>
-                                                    {msg.timestamp && (
-                                                        <span className="text-[9px] text-neutral-600">
-                                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className={`p-3.5 rounded-2xl max-w-sm sm:max-w-md text-xs font-mono leading-relaxed shadow-sm ${
-                                                    isMe 
-                                                        ? 'bg-white text-black font-medium rounded-tr-sm' 
-                                                        : 'bg-neutral-900 text-neutral-100 border border-neutral-800 rounded-tl-sm'
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-mono font-bold shrink-0 ${
+                                                    isSelected ? 'bg-white text-black' : 'bg-neutral-800 text-neutral-300'
                                                 }`}>
-                                                    {msg.text}
+                                                    {req.farmerName ? req.farmerName.slice(0, 2).toUpperCase() : 'FM'}
                                                 </div>
-                                            </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-baseline mb-0.5">
+                                                        <span className="text-xs font-bold text-white truncate">{req.farmerName || 'Cultivator'}</span>
+                                                        <span className="text-[9px] font-mono text-emerald-400 font-bold shrink-0">
+                                                            ₹{req.expectedPrice}/Q
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[11px] font-mono text-neutral-300 font-medium truncate">
+                                                        {req.cropName} • {req.quantity} {t.overviewTab.quintalsUnit}
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-[10px] font-mono text-neutral-500 mt-0.5">
+                                                        <span className="truncate">{lastMsg ? `${lastMsg.senderName}: ${lastMsg.text}` : (isKannada ? "ಸಂವಾದ ಪ್ರಾರಂಭಿಸಿ" : "Start negotiation")}</span>
+                                                        {lastMsg?.timestamp && (
+                                                            <span className="shrink-0 ml-1 text-[9px]">
+                                                                {new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </button>
                                         );
                                     })
-                            )}
+                                )}
+                            </div>
                         </div>
 
-                        {/* Quick Bid Chips */}
-                        {selectedRequest.expectedPrice && (
-                            <div className="px-4 py-2 bg-neutral-950 border-t border-neutral-900 flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
-                                <span className="text-[10px] font-mono text-neutral-500 shrink-0 uppercase">
-                                    {isKannada ? "ತ್ವರಿತ ಬಿಡ್:" : "Quick Bid:"}
-                                </span>
-                                {[
-                                    `₹${selectedRequest.expectedPrice - 100}/Q`,
-                                    `₹${selectedRequest.expectedPrice}/Q (${isKannada ? 'ಕೇಳಿದ ದರ' : 'Asking Rate'})`,
-                                    `₹${selectedRequest.expectedPrice + 50}/Q (${isKannada ? 'ಪ್ರೀಮಿಯಂ' : 'Fast Priority'})`,
-                                    isKannada ? "ಸಂಪೂರ್ಣ ಬ್ಯಾಚ್ ಖರೀದಿಸಲು ಸಿದ್ಧ" : "Ready for full lot procurement"
-                                ].map((chipText, idx) => (
+                        {/* RIGHT COLUMN: ACTIVE 1-ON-1 CONVERSATION & DEAL EXECUTION */}
+                        <div className="flex-1 flex flex-col bg-neutral-950 h-full overflow-hidden">
+                            {/* Modal Header */}
+                            <div className="p-4 border-b border-neutral-900 bg-neutral-900/30 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-neutral-800 border border-neutral-700 text-white flex items-center justify-center font-mono font-bold text-xs shrink-0">
+                                        {selectedRequest.farmerName ? selectedRequest.farmerName.slice(0, 2).toUpperCase() : 'FM'}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-sm font-bold uppercase text-white font-mono">
+                                                {selectedRequest.farmerName || (isKannada ? "ದೃಢೀಕರಿಸಿದ ರೈತರು" : "Verified Cultivator")}
+                                            </h3>
+                                            <span className="text-[9px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                                                {isKannada ? "ನೇರ ಬೆಳೆಗಾರ" : "Direct Producer"}
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
+                                            {selectedRequest.cropName} • <strong className="text-white">{selectedRequest.quantity} {t.overviewTab.quintalsUnit}</strong> • {t.negotiationModal.farmerAsking}: <strong className="text-emerald-400">₹{selectedRequest.expectedPrice}/Q</strong>
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedRequest(null)}
+                                    className="text-neutral-500 hover:text-white p-1.5 rounded-lg font-mono text-sm transition-colors"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            {/* Messages Area (Filtered strictly to this buyer's thread) */}
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 custom-scrollbar bg-neutral-950/60">
+                                {(!selectedRequest.messages || selectedRequest.messages.length === 0) ? (
+                                    <div className="text-center text-neutral-500 font-mono text-xs my-auto pt-24">
+                                        <div className="w-10 h-10 rounded-full bg-neutral-900 text-neutral-400 flex items-center justify-center mx-auto mb-2 text-sm">
+                                            💬
+                                        </div>
+                                        <p className="font-bold text-neutral-400 mb-1">{t.negotiationModal.noMessages}</p>
+                                        <p className="text-[11px] text-neutral-600">
+                                            {isKannada ? "ರೈತರಿಗೆ ನಿಮ್ಮ ದರ ಅಥವಾ ಖರೀದಿಯ ನಿಯಮಗಳನ್ನು ಕೆಳಗೆ ಕಳುಹಿಸಿ." : "Send an initial bid or counter-offer to the farmer below."}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    selectedRequest.messages
+                                        .filter(msg => msg.buyerId === user.id || msg.senderId === user.id || (!msg.buyerId && (msg.senderId === selectedRequest.farmerId || msg.senderRole === 'FARMER')))
+                                        .map((msg, i) => {
+                                            // Strictly identify if message is from Farmer (LEFT) vs Buyer (RIGHT)
+                                            const isFromFarmer = msg.senderRole === 'FARMER' || (msg.senderId === selectedRequest.farmerId && msg.senderRole !== 'BUYER');
+                                            const isMe = !isFromFarmer;
+
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                                                >
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 mb-1">
+                                                        <span>{isMe ? (isKannada ? 'ನೀವು (ಖರೀದಿದಾರರು)' : 'You (Buyer)') : (msg.senderName || selectedRequest.farmerName || 'Farmer')}</span>
+                                                        <span className={`px-1.5 py-0.2 rounded text-[8px] uppercase font-bold ${
+                                                            isMe ? 'bg-neutral-800 text-neutral-300' : 'bg-emerald-950 text-emerald-400 border border-emerald-900'
+                                                        }`}>
+                                                            {isFromFarmer ? 'FARMER' : 'BUYER'}
+                                                        </span>
+                                                        {msg.timestamp && (
+                                                            <span className="text-[9px] text-neutral-600">
+                                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className={`p-3.5 rounded-2xl max-w-sm sm:max-w-md text-xs font-mono leading-relaxed shadow-sm ${
+                                                        isMe 
+                                                            ? 'bg-white text-black font-medium rounded-tr-sm' 
+                                                            : 'bg-neutral-900 text-neutral-100 border border-neutral-800 rounded-tl-sm'
+                                                    }`}>
+                                                        {msg.text}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                )}
+                            </div>
+
+                            {/* Quick Bid Chips */}
+                            {selectedRequest.expectedPrice && (
+                                <div className="px-4 py-2 bg-neutral-950 border-t border-neutral-900 flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
+                                    <span className="text-[10px] font-mono text-neutral-500 shrink-0 uppercase">
+                                        {isKannada ? "ತ್ವರಿತ ಬಿಡ್:" : "Quick Bid:"}
+                                    </span>
+                                    {[
+                                        `₹${selectedRequest.expectedPrice - 100}/Q`,
+                                        `₹${selectedRequest.expectedPrice}/Q (${isKannada ? 'ಕೇಳಿದ ದರ' : 'Asking Rate'})`,
+                                        `₹${selectedRequest.expectedPrice + 50}/Q (${isKannada ? 'ಪ್ರೀಮಿಯಂ' : 'Fast Priority'})`,
+                                        isKannada ? "ಸಂಪೂರ್ಣ ಬ್ಯಾಚ್ ಖರೀದಿಸಲು ಸಿದ್ಧ" : "Ready for full lot procurement"
+                                    ].map((chipText, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => handleSendMessage(chipText)}
+                                            className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white transition-all whitespace-nowrap shrink-0"
+                                        >
+                                            {chipText}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Chat Input & Deal Execution */}
+                            <div className="p-3.5 border-t border-neutral-900 flex flex-col gap-2.5 bg-neutral-950">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                        placeholder={isKannada ? "ಆಫರ್ ಅಥವಾ ವಿತರಣಾ ನಿಯಮಗಳನ್ನು ಟೈಪ್ ಮಾಡಿ..." : "Type counter-offer or delivery terms (e.g. ₹7,300/Q, FOB farm-gate)..."}
+                                        className="flex-1 bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none transition-all placeholder:text-neutral-600"
+                                    />
                                     <button
-                                        key={idx}
-                                        type="button"
-                                        onClick={() => handleSendMessage(chipText)}
-                                        className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white transition-all whitespace-nowrap shrink-0"
+                                        onClick={() => handleSendMessage()}
+                                        disabled={!chatInput.trim()}
+                                        className="bg-neutral-800 hover:bg-neutral-700 text-white font-mono font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition-all disabled:opacity-40"
                                     >
-                                        {chipText}
+                                        {t.negotiationModal.sendBtn}
                                     </button>
-                                ))}
-                            </div>
-                        )}
+                                </div>
 
-                        {/* Chat Input & Deal Execution */}
-                        <div className="p-3.5 border-t border-neutral-900 flex flex-col gap-2.5 bg-neutral-950">
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={chatInput}
-                                    onChange={(e) => setChatInput(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                    placeholder={isKannada ? "ಆಫರ್ ಅಥವಾ ವಿತರಣಾ ನಿಯಮಗಳನ್ನು ಟೈಪ್ ಮಾಡಿ..." : "Type counter-offer or delivery terms (e.g. ₹7,300/Q, FOB farm-gate)..."}
-                                    className="flex-1 bg-neutral-900 border border-neutral-800 focus:border-white text-white rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none transition-all placeholder:text-neutral-600"
-                                />
-                                <button
-                                    onClick={() => handleSendMessage()}
-                                    disabled={!chatInput.trim()}
-                                    className="bg-neutral-800 hover:bg-neutral-700 text-white font-mono font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition-all disabled:opacity-40"
-                                >
-                                    {t.negotiationModal.sendBtn}
-                                </button>
-                            </div>
-
-                            <div className="flex gap-2 pt-2 border-t border-neutral-900">
-                                <input
-                                    type="number"
-                                    value={offerRate}
-                                    onChange={(e) => setOfferRate(e.target.value)}
-                                    placeholder={`${isKannada ? 'ಅಂತಿಮ ಒಪ್ಪಂದ ದರ' : 'Agreed Final Rate'} (₹/Q)`}
-                                    className="w-1/2 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:border-white focus:outline-none"
-                                />
-                                <button
-                                    onClick={handleApproveDeal}
-                                    disabled={!offerRate}
-                                    className="w-1/2 bg-white text-black font-mono font-bold text-xs uppercase rounded-xl hover:bg-neutral-200 transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-40"
-                                >
-                                    <span>{t.negotiationModal.confirmDeal}</span>
-                                </button>
+                                <div className="flex gap-2 pt-2 border-t border-neutral-900">
+                                    <input
+                                        type="number"
+                                        value={offerRate}
+                                        onChange={(e) => setOfferRate(e.target.value)}
+                                        placeholder={`${isKannada ? 'ಅಂತಿಮ ಒಪ್ಪಂದ ದರ' : 'Agreed Final Rate'} (₹/Q)`}
+                                        className="w-1/2 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-3.5 py-2.5 text-xs font-mono focus:border-white focus:outline-none"
+                                    />
+                                    <button
+                                        onClick={handleApproveDeal}
+                                        disabled={!offerRate}
+                                        className="w-1/2 bg-white text-black font-mono font-bold text-xs uppercase rounded-xl hover:bg-neutral-200 transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-40"
+                                    >
+                                        <span>{t.negotiationModal.confirmDeal}</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </motion.div>

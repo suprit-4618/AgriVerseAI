@@ -1230,21 +1230,20 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                                     </div>
                                 ) : (
                                     currentThreadMessages.map((msg, i) => {
-                                        const isMe = msg.senderId === user.id || msg.senderRole === 'FARMER';
+                                        const isFromBuyer = msg.senderRole === 'BUYER' || (msg.senderId !== user.id && msg.senderRole !== 'FARMER');
+                                        const isMe = !isFromBuyer;
                                         return (
                                             <div
                                                 key={i}
                                                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                                             >
                                                 <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 mb-1">
-                                                    <span>{msg.senderName}</span>
-                                                    {msg.senderRole && (
-                                                        <span className={`px-1 py-0.2 rounded text-[8px] uppercase font-bold ${
-                                                            isMe ? 'bg-neutral-800 text-neutral-300' : 'bg-emerald-950 text-emerald-400 border border-emerald-900'
-                                                        }`}>
-                                                            {msg.senderRole}
-                                                        </span>
-                                                    )}
+                                                    <span>{isMe ? (isKannada ? 'ನೀವು (ರೈತರು)' : 'You (Farmer)') : (msg.senderName || 'Buyer')}</span>
+                                                    <span className={`px-1.5 py-0.2 rounded text-[8px] uppercase font-bold ${
+                                                        isMe ? 'bg-neutral-800 text-neutral-300' : 'bg-emerald-950 text-emerald-400 border border-emerald-900'
+                                                    }`}>
+                                                        {isFromBuyer ? 'BUYER' : 'FARMER'}
+                                                    </span>
                                                     {msg.timestamp && (
                                                         <span className="text-[9px] text-neutral-600">
                                                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
