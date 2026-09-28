@@ -431,16 +431,21 @@ export const mandiRateService = {
     /**
      * Get live benchmark price for a specific crop and district
      */
-    getBenchmarkPrice: (cropName: string, district?: string): MarketRateRecord | undefined => {
+    getBenchmarkPrice: (cropName?: string, district?: any): MarketRateRecord | undefined => {
+        if (!cropName || typeof cropName !== 'string') return undefined;
         const cleanCrop = cropName.toLowerCase().trim();
-        const cleanDist = district?.toLowerCase().trim();
+        const distStr = typeof district === 'string' ? district : (typeof district?.name === 'string' ? district.name : '');
+        const cleanDist = distStr.toLowerCase().trim();
 
         // 1. Exact match with district + crop
         if (cleanDist) {
-            const exact = KARNATAKA_APMC_LIVE_DATA.find(r => 
-                r.district.toLowerCase().includes(cleanDist) && 
-                (r.commodity.toLowerCase().includes(cleanCrop) || cleanCrop.includes(r.commodity.toLowerCase()))
-            );
+            const exact = KARNATAKA_APMC_LIVE_DATA.find(r => {
+                const rDist = r.district.toLowerCase();
+                const rComm = r.commodity.toLowerCase();
+                const distMatches = cleanDist.includes(rDist) || rDist.includes(cleanDist);
+                const cropMatches = rComm.includes(cleanCrop) || cleanCrop.includes(rComm.split(' ')[0]);
+                return distMatches && cropMatches;
+            });
             if (exact) return { id: 'match_exact', ...exact };
         }
 

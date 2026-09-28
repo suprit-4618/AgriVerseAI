@@ -425,6 +425,7 @@ const App: React.FC = () => {
                     <SellCropModal
                         isOpen={isSellCropModalOpen}
                         onClose={() => setIsSellCropModalOpen(false)}
+                        user={currentUser || undefined}
                     />
                 )}
 

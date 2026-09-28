@@ -11,7 +11,7 @@ import { mandiRateService } from '../services/mandiRateService';
 interface SellCropModalProps {
     isOpen?: boolean;
     onClose: () => void;
-    user: UserProfile;
+    user?: UserProfile | null;
     texts?: UIStringContent;
     onSuccess?: () => void;
     initialCrop?: string;
@@ -53,13 +53,20 @@ const SellCropModal: React.FC<SellCropModalProps> = ({
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
 
+    const getInitialDistrictLocation = (): string => {
+        if (initialDistrict) return `${initialDistrict}, Karnataka`;
+        if (typeof user?.location === 'string' && user.location.trim()) return user.location;
+        if (typeof (user?.location as any)?.name === 'string') return (user?.location as any).name;
+        return 'Haveri, Karnataka';
+    };
+
     // Form Data
     const [category, setCategory] = useState<CropCategory>('Yields');
     const [selectedCrop, setSelectedCrop] = useState<string>(initialCrop || 'Cotton');
     const [quantity, setQuantity] = useState<string>('');
     const [expectedPrice, setExpectedPrice] = useState<string>(initialPrice ? initialPrice.toString() : '');
     const [selectedMarket, setSelectedMarket] = useState<string>(initialDistrict ? `${initialDistrict} APMC` : (karnatakaMarkets[0] || 'Haveri APMC'));
-    const [districtLocation, setDistrictLocation] = useState<string>(initialDistrict ? `${initialDistrict}, Karnataka` : (user?.location || 'Haveri, Karnataka'));
+    const [districtLocation, setDistrictLocation] = useState<string>(getInitialDistrictLocation);
     const [error, setError] = useState<string | null>(null);
 
     const liveBenchmark = mandiRateService.getBenchmarkPrice(selectedCrop, districtLocation);
@@ -74,6 +81,10 @@ const SellCropModal: React.FC<SellCropModalProps> = ({
         setError(null);
 
         try {
+            const farmerId = user?.id || `guest_${Date.now()}`;
+            const farmerName = user?.fullName || (isKannada ? 'ದೃಢೀಕರಿಸಿದ ರೈತರು' : 'Verified Farmer');
+            const farmerContact = (user?.details as any)?.phoneNumber || user?.phone || user?.email || '';
+
             await marketService.createRequest({
                 cropName: selectedCrop,
                 category: category,
@@ -81,9 +92,9 @@ const SellCropModal: React.FC<SellCropModalProps> = ({
                 expectedPrice: parseFloat(expectedPrice),
                 market: selectedMarket,
                 location: districtLocation,
-                farmerId: user.id,
-                farmerName: user.fullName || 'Verified Farmer',
-                farmerContact: user.details?.phoneNumber || user.email || ''
+                farmerId,
+                farmerName,
+                farmerContact
             });
 
             setStep(3); // Success step
