@@ -14,15 +14,40 @@ export enum UserRole {
 export type KycStatus = 'verified' | 'pending' | 'unverified';
 
 export interface UserProfileDetails {
-    // Farmer
+    // Contact & Location
+    phone?: string;
+    alternatePhone?: string;
+    village?: string;
+    taluk?: string;
+    district?: string;
+    state?: string;
+    pincode?: string;
+    
+    // Banking & Payout
+    bankAccount?: string;
+    bankIfsc?: string;
+    upiId?: string;
+    bankName?: string;
+
+    // Farmer Specific
+    farmName?: string;
     farmSize?: string;
+    soilType?: string;
+    irrigationType?: string;
     mainCrops?: string[];
     experience?: string;
+    kisanId?: string;
 
-    // Buyer
+    // Buyer / Trader Specific
     companyName?: string;
-    licenseNumber?: string;
+    traderType?: string; // 'APMC Commission Agent' | 'Wholesale Stockist' | 'Ginning Mill' | 'Food Processor' | 'Direct Exporter'
+    licenseNumber?: string; // APMC Mandi License / FSSAI
+    gstNumber?: string;
+    panNumber?: string;
+    mandiLocation?: string;
+    businessAddress?: string;
     preferredCrops?: string[];
+    monthlyProcurementCapacity?: string;
 
     // Admin
     department?: string;

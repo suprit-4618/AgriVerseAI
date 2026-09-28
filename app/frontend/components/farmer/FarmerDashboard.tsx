@@ -34,6 +34,7 @@ import LiveMandiRadar from '../LiveMandiRadar';
 import { uiStrings } from '../../constants';
 import { farmerTranslations } from '../../utils/translations';
 import { useLanguage } from '../../context/LanguageContext';
+import { FarmerProfileView } from './FarmerProfileView';
 
 interface FarmerDashboardProps {
     user: UserProfile;
@@ -43,7 +44,7 @@ interface FarmerDashboardProps {
     setCurrentLanguage?: (lang: Language) => void;
 }
 
-type FarmerTab = 'overview' | 'diagnostics' | 'assistant' | 'soil_weather' | 'marketplace' | 'schemes';
+type FarmerTab = 'overview' | 'diagnostics' | 'assistant' | 'soil_weather' | 'marketplace' | 'schemes' | 'profile';
 
 export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
     user,
@@ -118,8 +119,8 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
         }>();
 
         selectedRequest.messages.forEach(msg => {
-            const bId = msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== user.id ? msg.senderId : 'general_buyer'));
-            const bName = msg.buyerName || (msg.senderRole === 'BUYER' ? msg.senderName : (msg.senderId !== user.id ? msg.senderName : 'Verified Mandi Trader'));
+            const bId = msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== user.id ? msg.senderId : 'general_buyer_1'));
+            const bName = msg.buyerName || (msg.senderRole === 'BUYER' ? msg.senderName : (msg.senderId !== user.id ? msg.senderName : (isKannada ? 'ದೃಢೀಕರಿಸಿದ ವ್ಯಾಪಾರಿ' : 'Verified APMC Buyer')));
             
             let offer = msg.priceOffer;
             if (!offer && typeof msg.text === 'string') {
@@ -141,7 +142,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
         });
 
         return Array.from(threadMap.values());
-    }, [selectedRequest, user.id]);
+    }, [selectedRequest, user.id, isKannada]);
 
     // Auto-select first active buyer thread
     useEffect(() => {
@@ -161,7 +162,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
         if (buyerThreads.length === 0) return selectedRequest.messages;
         const targetBuyerId = activeBuyerId || buyerThreads[0]?.buyerId;
         return selectedRequest.messages.filter(msg => {
-            const bId = msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== user.id ? msg.senderId : 'general_buyer'));
+            const bId = msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== user.id ? msg.senderId : 'general_buyer_1'));
             return bId === targetBuyerId;
         });
     }, [selectedRequest, activeBuyerId, buyerThreads, user.id]);
@@ -212,7 +213,38 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
         { id: 'soil_weather', label: t.sidebar.soilWeather, icon: '🌦️', badge: null },
         { id: 'marketplace', label: t.sidebar.marketplace, icon: '⚖️', badge: pendingBidsCount > 0 ? `${pendingBidsCount} ${t.sidebar.activeBadge}` : null },
         { id: 'schemes', label: t.sidebar.schemes, icon: '📜', badge: t.sidebar.schemesBadge },
+        { id: 'profile', label: isKannada ? 'ವ್ಯಾಪಾರ ವಿವರ' : 'Business Profile', icon: '👤', badge: null },
     ];
+
+    const resolveMessageRole = (msg: RequestMessage, index: number): 'BUYER' | 'FARMER' => {
+        if (msg.senderRole === 'BUYER') return 'BUYER';
+        if (msg.senderRole === 'FARMER') {
+            const clean = (msg.text || '').toLowerCase().trim();
+            if (clean === 'no' || clean.startsWith('no ') || clean.includes('reject') || clean.includes('firm') || clean.includes('ready')) {
+                return 'FARMER';
+            }
+            if ((index === 0 || index % 2 === 0) && /^\d+|(?:rate|offer|qunital|quintal)/i.test(clean)) {
+                return 'BUYER';
+            }
+            return 'FARMER';
+        }
+        
+        // Sender check
+        if (msg.buyerId && msg.senderId === msg.buyerId) return 'BUYER';
+        if (selectedRequest && msg.senderId === selectedRequest.farmerId) {
+            const clean = (msg.text || '').toLowerCase().trim();
+            if ((index === 0 || index % 2 === 0) && /^\d+|(?:rate|offer|qunital|quintal)/i.test(clean)) {
+                return 'BUYER';
+            }
+            return 'FARMER';
+        }
+
+        const clean = (msg.text || '').toLowerCase().trim();
+        if (clean === 'no' || clean.startsWith('no ') || clean.includes('reject') || clean.includes('firm')) {
+            return 'FARMER';
+        }
+        return index % 2 === 0 ? 'BUYER' : 'FARMER';
+    };
 
     return (
         <div className="min-h-screen bg-black text-white flex overflow-hidden font-sans selection:bg-white selection:text-black">
@@ -1063,6 +1095,18 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                             </motion.div>
                         )}
 
+                        {/* TAB 7: BUSINESS & AGRICULTURAL PROFILE */}
+                        {activeTab === 'profile' && (
+                            <motion.div
+                                key="profile-tab"
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -8 }}
+                            >
+                                <FarmerProfileView user={user} isKannada={isKannada} />
+                            </motion.div>
+                        )}
+
                     </AnimatePresence>
                 </main>
             </div>
@@ -1161,7 +1205,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                                                     <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400">
                                                         <p className="truncate mr-1 text-[11px]">{thread.lastMessage?.text || 'Sent an offer'}</p>
                                                         {thread.latestOffer && (
-                                                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-900 shrink-0">
+                                                            <span className="text-[10px] font-bold text-white bg-neutral-900 px-2 py-0.5 rounded border border-neutral-700 shrink-0">
                                                                 ₹{thread.latestOffer}/Q
                                                             </span>
                                                         )}
@@ -1187,7 +1231,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                                             <h3 className="text-sm font-bold uppercase text-white font-mono">
                                                 {activeBuyerInfo?.buyerName || (isKannada ? "ವ್ಯಾಪಾರಿಗಳ ಮಾತುಕತೆ" : "Mandi Buyer Negotiation")}
                                             </h3>
-                                            <span className="text-[9px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                                            <span className="text-[9px] font-mono bg-neutral-800 text-neutral-300 border border-neutral-700 px-1.5 py-0.5 rounded font-bold">
                                                 {isKannada ? "ಪರಿಶೀಲಿತ ವ್ಯಾಪಾರಿ" : "Verified Trader"}
                                             </span>
                                         </div>
@@ -1202,7 +1246,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => handleApproveBuyerDeal(activeBuyerInfo.latestOffer!, activeBuyerInfo.buyerId, activeBuyerInfo.buyerName)}
-                                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-bold text-[11px] uppercase tracking-wider px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5"
+                                            className="bg-white hover:bg-neutral-200 text-black font-mono font-bold text-[11px] uppercase tracking-wider px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5"
                                         >
                                             <span>{isKannada ? "ಖರೀದಿ ಒಪ್ಪಿಕೊಳ್ಳಿ (Accept)" : "Accept Deal"} ₹{activeBuyerInfo.latestOffer}/Q</span>
                                         </button>
@@ -1230,29 +1274,33 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                                     </div>
                                 ) : (
                                     currentThreadMessages.map((msg, i) => {
-                                        const isFromBuyer = msg.senderRole === 'BUYER' || (msg.senderId !== user.id && msg.senderRole !== 'FARMER');
+                                        const role = resolveMessageRole(msg, i);
+                                        const isFromBuyer = role === 'BUYER';
                                         const isMe = !isFromBuyer;
+                                        const senderDisplayName = isMe 
+                                            ? (isKannada ? 'ನೀವು (ರೈತರು)' : 'You (Farmer)') 
+                                            : (activeBuyerInfo?.buyerName || msg.buyerName || msg.senderName || (isKannada ? 'ಖರೀದಿದಾರರು' : 'Mandi Trader'));
                                         return (
                                             <div
                                                 key={i}
                                                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                                             >
-                                                <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 mb-1">
-                                                    <span>{isMe ? (isKannada ? 'ನೀವು (ರೈತರು)' : 'You (Farmer)') : (msg.senderName || 'Buyer')}</span>
+                                                <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-400 mb-1">
+                                                    <span className="font-bold text-neutral-300">{senderDisplayName}</span>
                                                     <span className={`px-1.5 py-0.2 rounded text-[8px] uppercase font-bold ${
-                                                        isMe ? 'bg-neutral-800 text-neutral-300' : 'bg-emerald-950 text-emerald-400 border border-emerald-900'
+                                                        isMe ? 'bg-neutral-800 text-neutral-200 border border-neutral-700' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
                                                     }`}>
-                                                        {isFromBuyer ? 'BUYER' : 'FARMER'}
+                                                        {role}
                                                     </span>
                                                     {msg.timestamp && (
-                                                        <span className="text-[9px] text-neutral-600">
+                                                        <span className="text-[9px] text-neutral-500">
                                                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
                                                     )}
                                                 </div>
                                                 <div className={`p-3.5 rounded-2xl max-w-sm sm:max-w-md text-xs font-mono leading-relaxed shadow-sm ${
                                                     isMe 
-                                                        ? 'bg-white text-black font-medium rounded-tr-sm' 
+                                                        ? 'bg-white text-black font-semibold rounded-tr-sm' 
                                                         : 'bg-neutral-900 text-neutral-100 border border-neutral-800 rounded-tl-sm'
                                                 }`}>
                                                     {msg.text}
@@ -1265,7 +1313,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
 
                             {/* Quick Counter Chips */}
                             {selectedRequest.expectedPrice && (
-                                <div className="px-4 py-2 bg-neutral-950 border-t border-neutral-900 flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
+                                <div className="px-4 py-2 bg-neutral-950 border-t border-neutral-900 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
                                     <span className="text-[10px] font-mono text-neutral-500 shrink-0 uppercase">
                                         {isKannada ? "ತ್ವರಿತ ಕೌಂಟರ್:" : "Quick Counter:"}
                                     </span>
@@ -1288,7 +1336,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                             )}
 
                             {/* Chat Footer Input */}
-                            <div className="p-3.5 border-t border-neutral-900 flex gap-2 bg-neutral-950">
+                            <div className="p-3.5 border-t border-neutral-900 flex gap-2 bg-neutral-950 shrink-0">
                                 <input
                                     type="text"
                                     value={chatInput}

@@ -24,6 +24,7 @@ import LiveMandiRadar from '../LiveMandiRadar';
 import { uiStrings, karnatakaMarkets } from '../../constants';
 import { buyerTranslations } from '../../utils/translations';
 import { useLanguage } from '../../context/LanguageContext';
+import { BuyerProfileView } from './BuyerProfileView';
 
 interface BuyerDashboardProps {
     user: UserProfile;
@@ -33,7 +34,7 @@ interface BuyerDashboardProps {
     setCurrentLanguage?: (lang: Language) => void;
 }
 
-type BuyerTab = 'overview' | 'marketplace' | 'mandi_rates' | 'orders';
+type BuyerTab = 'overview' | 'marketplace' | 'mandi_rates' | 'orders' | 'profile';
 
 export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
     user,
@@ -81,12 +82,13 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
         const textToSend = customText || chatInput;
         if (!selectedRequest || !textToSend.trim()) return;
         try {
+            const buyerBusinessName = user.details?.companyName || user.fullName || (activeLanguage === Language.KN ? 'ಖರೀದಿದಾರರು' : 'Verified Mandi Trader');
             const msg = await marketService.addMessage(selectedRequest.id, {
                 senderId: user.id,
-                senderName: user.fullName || (activeLanguage === Language.KN ? 'ಖರೀದಿದಾರರು' : 'Buyer Agent'),
+                senderName: buyerBusinessName,
                 senderRole: 'BUYER',
                 buyerId: user.id,
-                buyerName: user.fullName || 'Verified Mandi Trader',
+                buyerName: buyerBusinessName,
                 text: textToSend.trim()
             });
             setSelectedRequest({
@@ -103,7 +105,7 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
         if (!selectedRequest || !offerRate) return;
         try {
             const finalRate = parseFloat(offerRate);
-            const buyerName = user.fullName || (activeLanguage === Language.KN ? 'ಖರೀದಿದಾರರು' : 'Buyer Agent');
+            const buyerName = user.details?.companyName || user.fullName || (activeLanguage === Language.KN ? 'ಖರೀದಿದಾರರು' : 'Verified Mandi Trader');
             await marketService.generateBill(selectedRequest, buyerName, finalRate);
             await marketService.updateStatus(selectedRequest.id, 'APPROVED', finalRate, user.id, buyerName);
             setShowApprovalModal(false);
@@ -151,7 +153,38 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
         { id: 'marketplace', label: t.sidebar.marketplace, icon: '🛒', badge: pendingDeals.length > 0 ? `${pendingDeals.length} ${t.sidebar.batchesBadge}` : null },
         { id: 'mandi_rates', label: t.sidebar.mandiRates, icon: '📊', badge: t.sidebar.liveMandiBadge },
         { id: 'orders', label: t.sidebar.orders, icon: '📜', badge: orders.length > 0 ? `${orders.length} ${t.sidebar.settledBadge}` : null },
+        { id: 'profile', label: isKannada ? 'ವ್ಯಾಪಾರ ವಿವರ' : 'Business Profile', icon: '👤', badge: null },
     ];
+
+    const resolveMessageRole = (msg: any, index: number): 'BUYER' | 'FARMER' => {
+        if (msg.senderRole === 'BUYER') return 'BUYER';
+        if (msg.senderRole === 'FARMER') {
+            const clean = (msg.text || '').toLowerCase().trim();
+            if (clean === 'no' || clean.startsWith('no ') || clean.includes('reject') || clean.includes('firm') || clean.includes('ready')) {
+                return 'FARMER';
+            }
+            if ((index === 0 || index % 2 === 0) && /^\d+|(?:rate|offer|qunital|quintal)/i.test(clean)) {
+                return 'BUYER';
+            }
+            return 'FARMER';
+        }
+        
+        // Sender check
+        if (msg.buyerId && msg.senderId === msg.buyerId) return 'BUYER';
+        if (selectedRequest && msg.senderId === selectedRequest.farmerId) {
+            const clean = (msg.text || '').toLowerCase().trim();
+            if ((index === 0 || index % 2 === 0) && /^\d+|(?:rate|offer|qunital|quintal)/i.test(clean)) {
+                return 'BUYER';
+            }
+            return 'FARMER';
+        }
+
+        const clean = (msg.text || '').toLowerCase().trim();
+        if (clean === 'no' || clean.startsWith('no ') || clean.includes('reject') || clean.includes('firm')) {
+            return 'FARMER';
+        }
+        return index % 2 === 0 ? 'BUYER' : 'FARMER';
+    };
 
     return (
         <div className="min-h-screen bg-black text-white flex overflow-hidden font-sans selection:bg-white selection:text-black">
@@ -674,6 +707,18 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                             </motion.div>
                         )}
 
+                        {/* TAB 5: MANDI TRADER BUSINESS PROFILE */}
+                        {activeTab === 'profile' && (
+                            <motion.div
+                                key="profile-tab"
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -8 }}
+                            >
+                                <BuyerProfileView user={user} isKannada={isKannada} />
+                            </motion.div>
+                        )}
+
                     </AnimatePresence>
                 </main>
             </div>
@@ -733,7 +778,7 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex justify-between items-baseline mb-0.5">
                                                         <span className="text-xs font-bold text-white truncate">{req.farmerName || 'Cultivator'}</span>
-                                                        <span className="text-[9px] font-mono text-emerald-400 font-bold shrink-0">
+                                                        <span className="text-[10px] font-mono text-white bg-neutral-900 px-1.5 py-0.5 rounded border border-neutral-800 font-bold shrink-0">
                                                             ₹{req.expectedPrice}/Q
                                                         </span>
                                                     </div>
@@ -769,12 +814,12 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                                             <h3 className="text-sm font-bold uppercase text-white font-mono">
                                                 {selectedRequest.farmerName || (isKannada ? "ದೃಢೀಕರಿಸಿದ ರೈತರು" : "Verified Cultivator")}
                                             </h3>
-                                            <span className="text-[9px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                                            <span className="text-[9px] font-mono bg-neutral-800 text-neutral-300 border border-neutral-700 px-2 py-0.5 rounded-full font-bold">
                                                 {isKannada ? "ನೇರ ಬೆಳೆಗಾರ" : "Direct Producer"}
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
-                                            {selectedRequest.cropName} • <strong className="text-white">{selectedRequest.quantity} {t.overviewTab.quintalsUnit}</strong> • {t.negotiationModal.farmerAsking}: <strong className="text-emerald-400">₹{selectedRequest.expectedPrice}/Q</strong>
+                                            {selectedRequest.cropName} • <strong className="text-white">{selectedRequest.quantity} {t.overviewTab.quintalsUnit}</strong> • {t.negotiationModal.farmerAsking}: <strong className="text-white">₹{selectedRequest.expectedPrice}/Q</strong>
                                         </p>
                                     </div>
                                 </div>
@@ -803,30 +848,34 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                                         .filter(msg => msg.buyerId === user.id || msg.senderId === user.id || (!msg.buyerId && (msg.senderId === selectedRequest.farmerId || msg.senderRole === 'FARMER')))
                                         .map((msg, i) => {
                                             // Strictly identify if message is from Farmer (LEFT) vs Buyer (RIGHT)
-                                            const isFromFarmer = msg.senderRole === 'FARMER' || (msg.senderId === selectedRequest.farmerId && msg.senderRole !== 'BUYER');
+                                            const role = resolveMessageRole(msg, i);
+                                            const isFromFarmer = role === 'FARMER';
                                             const isMe = !isFromFarmer;
+                                            const senderDisplayName = isMe 
+                                                ? (isKannada ? 'ನೀವು (ಖರೀದಿದಾರರು)' : 'You (Buyer)') 
+                                                : (selectedRequest.farmerName || msg.senderName || (isKannada ? 'ರೈತರು' : 'Farmer Cultivator'));
 
                                             return (
                                                 <div
                                                     key={i}
                                                     className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                                                 >
-                                                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 mb-1">
-                                                        <span>{isMe ? (isKannada ? 'ನೀವು (ಖರೀದಿದಾರರು)' : 'You (Buyer)') : (msg.senderName || selectedRequest.farmerName || 'Farmer')}</span>
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-400 mb-1">
+                                                        <span className="font-bold text-neutral-300">{senderDisplayName}</span>
                                                         <span className={`px-1.5 py-0.2 rounded text-[8px] uppercase font-bold ${
-                                                            isMe ? 'bg-neutral-800 text-neutral-300' : 'bg-emerald-950 text-emerald-400 border border-emerald-900'
+                                                            isMe ? 'bg-neutral-800 text-neutral-200 border border-neutral-700' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
                                                         }`}>
-                                                            {isFromFarmer ? 'FARMER' : 'BUYER'}
+                                                            {role}
                                                         </span>
                                                         {msg.timestamp && (
-                                                            <span className="text-[9px] text-neutral-600">
+                                                            <span className="text-[9px] text-neutral-500">
                                                                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                             </span>
                                                         )}
                                                     </div>
                                                     <div className={`p-3.5 rounded-2xl max-w-sm sm:max-w-md text-xs font-mono leading-relaxed shadow-sm ${
                                                         isMe 
-                                                            ? 'bg-white text-black font-medium rounded-tr-sm' 
+                                                            ? 'bg-white text-black font-semibold rounded-tr-sm' 
                                                             : 'bg-neutral-900 text-neutral-100 border border-neutral-800 rounded-tl-sm'
                                                     }`}>
                                                         {msg.text}
@@ -839,7 +888,7 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
 
                             {/* Quick Bid Chips */}
                             {selectedRequest.expectedPrice && (
-                                <div className="px-4 py-2 bg-neutral-950 border-t border-neutral-900 flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
+                                <div className="px-4 py-2 bg-neutral-950 border-t border-neutral-900 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
                                     <span className="text-[10px] font-mono text-neutral-500 shrink-0 uppercase">
                                         {isKannada ? "ತ್ವರಿತ ಬಿಡ್:" : "Quick Bid:"}
                                     </span>
@@ -862,7 +911,7 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                             )}
 
                             {/* Chat Input & Deal Execution */}
-                            <div className="p-3.5 border-t border-neutral-900 flex flex-col gap-2.5 bg-neutral-950">
+                            <div className="p-3.5 border-t border-neutral-900 flex flex-col gap-2.5 bg-neutral-950 shrink-0">
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -875,7 +924,7 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                                     <button
                                         onClick={() => handleSendMessage()}
                                         disabled={!chatInput.trim()}
-                                        className="bg-neutral-800 hover:bg-neutral-700 text-white font-mono font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition-all disabled:opacity-40"
+                                        className="bg-white text-black hover:bg-neutral-200 font-mono font-bold text-xs uppercase px-5 py-2.5 rounded-xl transition-all disabled:opacity-40"
                                     >
                                         {t.negotiationModal.sendBtn}
                                     </button>
