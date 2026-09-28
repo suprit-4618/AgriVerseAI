@@ -286,24 +286,32 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                     </div>
 
                     {/* Farmer Profile Card Pill */}
-                    <div className="p-4 border-b border-neutral-900/60 bg-neutral-900/20">
+                    <button 
+                        type="button"
+                        onClick={() => setActiveTab('profile')}
+                        className={`w-full text-left p-4 border-b border-neutral-900/60 transition-all ${
+                            activeTab === 'profile' ? 'bg-neutral-900/80 border-l-2 border-white' : 'bg-neutral-900/20 hover:bg-neutral-900/50'
+                        }`}
+                        title="Click to view & edit Business Profile"
+                    >
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-white text-black font-mono font-bold flex items-center justify-center shrink-0 text-xs">
+                            <div className="w-9 h-9 rounded-xl bg-white text-black font-mono font-bold flex items-center justify-center shrink-0 text-xs shadow-sm">
                                 {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'F'}
                             </div>
                             {!sidebarCollapsed && (
-                                <div className="overflow-hidden">
-                                    <div className="text-xs font-bold text-white truncate">
-                                        {user.fullName || t.sidebar.farmerRole}
+                                <div className="overflow-hidden flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-white truncate flex items-center justify-between">
+                                        <span className="truncate">{user.fullName || t.sidebar.farmerRole}</span>
+                                        <span className="text-[9px] font-mono text-neutral-500 uppercase">Edit ✎</span>
                                     </div>
                                     <div className="text-[10px] font-mono text-neutral-400 flex items-center gap-1 mt-0.5">
-                                        <MapPinIcon className="w-3 h-3 text-neutral-500" />
+                                        <MapPinIcon className="w-3 h-3 text-neutral-500 shrink-0" />
                                         <span className="truncate">{user.location || (activeLanguage === Language.KN ? 'ಕರ್ನಾಟಕ, ಭಾರತ' : 'Karnataka, India')}</span>
                                     </div>
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </button>
 
                     {/* Main Navigation Links */}
                     <nav className="p-3 space-y-1.5">

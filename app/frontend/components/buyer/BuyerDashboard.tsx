@@ -215,24 +215,32 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                     </div>
 
                     {/* Buyer Profile Pill */}
-                    <div className="p-4 border-b border-neutral-900/60 bg-neutral-900/20">
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('profile')}
+                        className={`w-full text-left p-4 border-b border-neutral-900/60 transition-all ${
+                            activeTab === 'profile' ? 'bg-neutral-900/80 border-l-2 border-white' : 'bg-neutral-900/20 hover:bg-neutral-900/50'
+                        }`}
+                        title="Click to view & edit Business Profile"
+                    >
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-white text-black font-mono font-bold flex items-center justify-center shrink-0 text-xs">
-                                {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'B'}
+                            <div className="w-9 h-9 rounded-xl bg-white text-black font-mono font-bold flex items-center justify-center shrink-0 text-xs shadow-sm">
+                                {user.details?.companyName ? user.details.companyName.charAt(0).toUpperCase() : (user.fullName ? user.fullName.charAt(0).toUpperCase() : 'B')}
                             </div>
                             {!sidebarCollapsed && (
-                                <div className="overflow-hidden">
-                                    <div className="text-xs font-bold text-white truncate">
-                                        {user.fullName || t.sidebar.buyerRole}
+                                <div className="overflow-hidden flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-white truncate flex items-center justify-between">
+                                        <span className="truncate">{user.details?.companyName || user.fullName || t.sidebar.buyerRole}</span>
+                                        <span className="text-[9px] font-mono text-neutral-500 uppercase">Edit ✎</span>
                                     </div>
                                     <div className="text-[10px] font-mono text-neutral-400 flex items-center gap-1 mt-0.5">
-                                        <BuildingIcon className="w-3 h-3 text-neutral-500" />
-                                        <span className="truncate">{t.sidebar.buyerRole}</span>
+                                        <BuildingIcon className="w-3 h-3 text-neutral-500 shrink-0" />
+                                        <span className="truncate">{user.location || (isKannada ? 'ಎಪಿಎಂಸಿ ಮಂಡಿ' : 'APMC Mandi Hub')}</span>
                                     </div>
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </button>
 
                     {/* Navigation Items */}
                     <nav className="p-3 space-y-1.5">
