@@ -93,9 +93,15 @@ export interface MarketRateRecord {
     marketName: string;
     district: string;
     commodity: string;
+    commodityKn?: string;
+    category?: 'Cereals' | 'Pulses' | 'Oilseeds' | 'Cash Crops' | 'Spices' | 'Vegetables' | 'Fruits' | 'Plantation' | string;
+    variety?: string;
+    grade?: string;
     minPrice: number;
     maxPrice: number;
     modalPrice: number;
+    mspPrice?: number;
+    arrivalsTonnes?: number;
     priceTrend: 'UP' | 'DOWN' | 'STABLE';
     changePercentage: string;
     updatedAt: string;

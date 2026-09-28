@@ -30,6 +30,7 @@ import PlantAnalysis from '../PlantAnalysis';
 import SoilAnalysis from '../SoilAnalysis';
 import WeatherView from '../WeatherView';
 import SellCropModal from '../SellCropModal';
+import LiveMandiRadar from '../LiveMandiRadar';
 import { uiStrings } from '../../constants';
 import { farmerTranslations } from '../../utils/translations';
 import { useLanguage } from '../../context/LanguageContext';
@@ -58,9 +59,15 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
     const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
     const [isLoadingRequests, setIsLoadingRequests] = useState(false);
     const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+    const [sellPrefill, setSellPrefill] = useState<{ crop?: string; district?: string; price?: number }>({});
     const [selectedRequest, setSelectedRequest] = useState<CropSellRequest | null>(null);
     const [chatInput, setChatInput] = useState('');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+    const handleOpenSellModal = (crop?: string, district?: string, price?: number) => {
+        setSellPrefill({ crop, district, price });
+        setIsSellModalOpen(true);
+    };
 
     // Real-Time Firestore Role & Telemetry Sync (onSnapshot)
     useEffect(() => {
@@ -758,9 +765,12 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="max-w-7xl mx-auto space-y-6"
+                                className="max-w-7xl mx-auto space-y-8"
                             >
-                                {/* 1. Active Harvest Listings */}
+                                {/* 1. Real-Time Karnataka APMC Mandi Radar */}
+                                <LiveMandiRadar onListHarvest={handleOpenSellModal} />
+
+                                {/* 2. Active Harvest Listings */}
                                 <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
                                     <div className="flex justify-between items-center mb-6">
                                         <div>
@@ -772,7 +782,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                                             </p>
                                         </div>
                                         <button
-                                            onClick={() => setIsSellModalOpen(true)}
+                                            onClick={() => handleOpenSellModal()}
                                             className="bg-white text-black font-mono font-bold text-xs uppercase px-4 py-2.5 rounded-xl hover:bg-neutral-200 transition-all flex items-center gap-2"
                                         >
                                             <ArrowUpRightIcon className="w-4 h-4" />
@@ -977,11 +987,18 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
             {/* 3. Sell Crop Modal */}
             <SellCropModal
                 isOpen={isSellModalOpen}
-                onClose={() => setIsSellModalOpen(false)}
+                onClose={() => {
+                    setIsSellModalOpen(false);
+                    setSellPrefill({});
+                }}
                 user={user}
+                initialCrop={sellPrefill.crop}
+                initialDistrict={sellPrefill.district}
+                initialPrice={sellPrefill.price}
                 onSuccess={() => {
                     marketService.getRequestsByFarmer(user.id).then(setSellRequests);
                     setIsSellModalOpen(false);
+                    setSellPrefill({});
                 }}
             />
 

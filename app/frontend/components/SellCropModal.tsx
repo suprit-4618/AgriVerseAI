@@ -6,12 +6,17 @@ import { marketService } from '../services/marketService';
 import { SparklesIcon, CheckCircleIcon, ArrowLeftIcon, ArrowRightIcon } from './common/IconComponents';
 import { useLanguage } from '../context/LanguageContext';
 
+import { mandiRateService } from '../services/mandiRateService';
+
 interface SellCropModalProps {
     isOpen?: boolean;
     onClose: () => void;
     user: UserProfile;
     texts?: UIStringContent;
     onSuccess?: () => void;
+    initialCrop?: string;
+    initialDistrict?: string;
+    initialPrice?: number;
 }
 
 const cropData: Record<CropCategory, string[]> = {
@@ -35,7 +40,10 @@ const SellCropModal: React.FC<SellCropModalProps> = ({
     isOpen = false, 
     onClose, 
     user, 
-    onSuccess 
+    onSuccess,
+    initialCrop,
+    initialDistrict,
+    initialPrice
 }) => {
     const { sellModalTexts: t, isKannada } = useLanguage();
 
@@ -47,12 +55,14 @@ const SellCropModal: React.FC<SellCropModalProps> = ({
 
     // Form Data
     const [category, setCategory] = useState<CropCategory>('Yields');
-    const [selectedCrop, setSelectedCrop] = useState<string>('Cotton');
+    const [selectedCrop, setSelectedCrop] = useState<string>(initialCrop || 'Cotton');
     const [quantity, setQuantity] = useState<string>('');
-    const [expectedPrice, setExpectedPrice] = useState<string>('');
-    const [selectedMarket, setSelectedMarket] = useState<string>(karnatakaMarkets[0] || 'Haveri APMC');
-    const [districtLocation, setDistrictLocation] = useState<string>('Haveri, Karnataka');
+    const [expectedPrice, setExpectedPrice] = useState<string>(initialPrice ? initialPrice.toString() : '');
+    const [selectedMarket, setSelectedMarket] = useState<string>(initialDistrict ? `${initialDistrict} APMC` : (karnatakaMarkets[0] || 'Haveri APMC'));
+    const [districtLocation, setDistrictLocation] = useState<string>(initialDistrict ? `${initialDistrict}, Karnataka` : (user?.location || 'Haveri, Karnataka'));
     const [error, setError] = useState<string | null>(null);
+
+    const liveBenchmark = mandiRateService.getBenchmarkPrice(selectedCrop, districtLocation);
 
     const handleSubmit = async () => {
         if (!quantity || !expectedPrice) {
@@ -227,6 +237,28 @@ const SellCropModal: React.FC<SellCropModalProps> = ({
                                 exit={{ opacity: 0, x: -10 }}
                                 className="space-y-4"
                             >
+                                {liveBenchmark && (
+                                    <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-xl flex items-center justify-between text-xs font-mono">
+                                        <div>
+                                            <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                                                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                                                <span>{isKannada ? "ಲೈವ್ ಎಪಿಎಂಸಿ ದರ (Live APMC Rate):" : "Live APMC Modal Benchmark:"}</span>
+                                            </div>
+                                            <p className="text-[11px] text-neutral-300 mt-0.5">
+                                                {liveBenchmark.marketName}: <strong className="text-white">₹{liveBenchmark.modalPrice}/Q</strong>
+                                                <span className="text-neutral-400 ml-1">(Min: ₹{liveBenchmark.minPrice} - Max: ₹{liveBenchmark.maxPrice})</span>
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setExpectedPrice(liveBenchmark.modalPrice.toString())}
+                                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-[10px] uppercase px-2.5 py-1.5 rounded-lg transition-all"
+                                        >
+                                            {isKannada ? "ಬಳಸಿ" : "Apply Rate"}
+                                        </button>
+                                    </div>
+                                )}
+
                                 <div>
                                     <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1.5">
                                         {t.expectedPrice}

@@ -20,6 +20,7 @@ import {
 import LanguageToggle from '../common/LanguageToggle';
 import NotificationCenter from '../NotificationCenter';
 import MarketplaceView from '../MarketplaceView';
+import LiveMandiRadar from '../LiveMandiRadar';
 import { uiStrings, karnatakaMarkets } from '../../constants';
 import { buyerTranslations } from '../../utils/translations';
 import { useLanguage } from '../../context/LanguageContext';
@@ -546,15 +547,9 @@ export const BuyerDashboard: React.FC<BuyerDashboardProps> = ({
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="max-w-7xl mx-auto"
+                                className="max-w-7xl mx-auto space-y-6"
                             >
-                                <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-                                    <MarketplaceView
-                                        texts={texts}
-                                        currentLanguage={activeLanguage}
-                                        onClose={() => setActiveTab('overview')}
-                                    />
-                                </div>
+                                <LiveMandiRadar />
                             </motion.div>
                         )}
 
