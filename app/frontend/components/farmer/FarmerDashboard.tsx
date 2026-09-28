@@ -107,9 +107,20 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
         };
     }, [user.id]);
 
-    // Segment messages by distinct buyers (WhatsApp style threads)
+    // Segment messages by distinct buyers (Each buyer has a unique ID)
     const buyerThreads = useMemo(() => {
         if (!selectedRequest?.messages || selectedRequest.messages.length === 0) return [];
+        
+        // Find all distinct buyer IDs present in the messages
+        const distinctBuyerIds = Array.from(new Set(
+            selectedRequest.messages
+                .map(m => m.buyerId || (m.senderRole === 'BUYER' ? m.senderId : (m.senderId !== selectedRequest.farmerId && m.senderId !== user.id ? m.senderId : null)))
+                .filter((id): id is string => Boolean(id))
+        ));
+
+        // If at most 1 distinct buyer is detected, unify all messages into that single thread
+        const singleBuyerId = distinctBuyerIds.length <= 1 ? (distinctBuyerIds[0] || 'mandi_buyer_1') : null;
+
         const threadMap = new Map<string, {
             buyerId: string;
             buyerName: string;
@@ -119,8 +130,8 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
         }>();
 
         selectedRequest.messages.forEach(msg => {
-            const bId = msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== user.id ? msg.senderId : 'general_buyer_1'));
-            const bName = msg.buyerName || (msg.senderRole === 'BUYER' ? msg.senderName : (msg.senderId !== user.id ? msg.senderName : (isKannada ? 'ದೃಢೀಕರಿಸಿದ ವ್ಯಾಪಾರಿ' : 'Verified APMC Buyer')));
+            const bId = singleBuyerId || msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== selectedRequest.farmerId && msg.senderId !== user.id ? msg.senderId : 'mandi_buyer_1'));
+            const bName = msg.buyerName || (msg.senderRole === 'BUYER' ? msg.senderName : (msg.senderId !== selectedRequest.farmerId && msg.senderId !== user.id ? msg.senderName : ''));
             
             let offer = msg.priceOffer;
             if (!offer && typeof msg.text === 'string') {
@@ -134,7 +145,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
             const prev = threadMap.get(bId);
             threadMap.set(bId, {
                 buyerId: bId,
-                buyerName: bName,
+                buyerName: bName || prev?.buyerName || (isKannada ? 'ದೃಢೀಕರಿಸಿದ ವ್ಯಾಪಾರಿ' : 'Verified Mandi Trader'),
                 lastMessage: msg,
                 latestOffer: offer || prev?.latestOffer,
                 messageCount: (prev?.messageCount || 0) + 1
@@ -158,11 +169,11 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
     }, [buyerThreads, activeBuyerId]);
 
     const currentThreadMessages = useMemo(() => {
-        if (!selectedRequest?.messages) return [];
-        if (buyerThreads.length === 0) return selectedRequest.messages;
+        if (!selectedRequest?.messages || selectedRequest.messages.length === 0) return [];
+        if (buyerThreads.length <= 1) return selectedRequest.messages;
         const targetBuyerId = activeBuyerId || buyerThreads[0]?.buyerId;
         return selectedRequest.messages.filter(msg => {
-            const bId = msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== user.id ? msg.senderId : 'general_buyer_1'));
+            const bId = msg.buyerId || (msg.senderRole === 'BUYER' ? msg.senderId : (msg.senderId !== selectedRequest.farmerId && msg.senderId !== user.id ? msg.senderId : 'mandi_buyer_1'));
             return bId === targetBuyerId;
         });
     }, [selectedRequest, activeBuyerId, buyerThreads, user.id]);
