@@ -30,24 +30,34 @@ export const diseaseLogService = {
             const now = new Date().toISOString();
             
             // Extract remedies
-            const organic = report.remedies?.organic 
-                ? [report.remedies.organic.treatment, ...(report.remedies.organic.steps || [])]
-                : [];
-            const chemical = report.remedies?.chemical 
-                ? [report.remedies.chemical.treatment, ...(report.remedies.chemical.steps || [])]
-                : [];
-            const prevention = report.preventionTips || [];
+            const organic = [
+                report.treatment?.organicRemedy?.en,
+                ...(report.treatment?.organicSteps?.en || [])
+            ].filter((s): s is string => Boolean(s));
+
+            const chemical = [
+                report.treatment?.medicineName?.en,
+                ...(report.treatment?.usageInstructions?.en || [])
+            ].filter((s): s is string => Boolean(s));
+
+            const prevention = report.prevention?.en || [];
+
+            const isHealthy = !report.isDiseaseFound;
 
             const logData: Omit<DiseaseLog, 'id'> = {
                 farmerId,
                 farmerName,
                 crop: crop || report.cropName?.en || 'Crop',
-                diseaseName: report.diseaseName?.en || (report.isHealthy ? 'Healthy Plant' : 'Unknown Disease'),
-                confidenceScore: Math.round((report.confidence || 0.95) * 100),
-                severity: report.severity?.en as any || (report.isHealthy ? 'Healthy' : 'Moderate'),
-                organicRemedy: organic.filter(Boolean),
-                chemicalRemedy: chemical.filter(Boolean),
-                preventionTips: prevention.filter(Boolean),
+                diseaseName: report.diseaseName?.en || (isHealthy ? 'Healthy Plant' : 'Unknown Disease'),
+                confidenceScore: Math.round(
+                    typeof report.confidenceScore === 'number'
+                        ? (report.confidenceScore > 1 ? report.confidenceScore : report.confidenceScore * 100)
+                        : 95
+                ),
+                severity: (report.severity?.en as any) || (isHealthy ? 'Healthy' : 'Moderate'),
+                organicRemedy: organic,
+                chemicalRemedy: chemical,
+                preventionTips: prevention,
                 imageUrl: imageUrl || '',
                 location: location || 'Karnataka, India',
                 timestamp: now

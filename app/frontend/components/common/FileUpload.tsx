@@ -25,7 +25,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileAccepted, promptText = 'D
     onDrop,
     accept: { 'image/*': ['.jpeg', '.png', '.jpg', '.gif'] },
     maxFiles: 1,
-  });
+  } as any);
 
   return (
     <div

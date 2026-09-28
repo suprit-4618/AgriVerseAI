@@ -49,7 +49,7 @@ export const orderService = {
                 totalAmount,
                 marketFee: 0, // 0% Middleman Platform Fee
                 status: 'CONFIRMED',
-                deliveryLocation: deliveryLocation || request.location?.name || 'Karnataka Farm-Gate',
+                deliveryLocation: deliveryLocation || (typeof request.location === 'string' ? request.location : request.location?.name) || 'Karnataka Farm-Gate',
                 weighbridgeReceiptId: `WB-${Math.floor(100000 + Math.random() * 900000)}`,
                 createdAt: now,
                 updatedAt: now,

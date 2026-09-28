@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Chat, Type, Part, Modality } from "@google/genai";
 import { GEMINI_MODEL_TEXT, GEMINI_MODEL_VISION } from '../constants';
-import { SoilData, SoilAnalysisReport, PlantAnalysisReport, MarketAnalysisReport, SoilImageAnalysisReport, Language } from '../types';
+import { SoilData, SoilAnalysisReport, PlantAnalysisReport, MarketAnalysisReport, SoilImageAnalysisReport, Language, ChatMessage, UserProfile } from '../types';
 import { BHOOMI_SYSTEM_PROMPT } from './bhoomiPrompt';
 
 const getGeminiKey = (): string => {

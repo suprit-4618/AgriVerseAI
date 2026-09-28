@@ -102,14 +102,16 @@ export interface MarketRateRecord {
 }
 
 export interface ChatMessage {
-    id: string;
+    id?: string;
     role: 'user' | 'model';
-    text: string;
+    text?: string;
+    parts?: { text: string }[];
     attachment?: {
         name: string;
         type: string;
         dataUrl?: string; // Add dataUrl for preview
-    };
+    } | File;
+    plantAnalysis?: PlantAnalysisReport;
     analysisReport?: PlantAnalysisReport; // Add this for dashboard responses
 }
 
@@ -418,18 +420,21 @@ export interface CropSellRequest {
     id: string;
     farmerId: string;
     farmerName: string;
-    category: CropCategory;
+    farmerContact?: string;
+    category?: CropCategory;
     cropName: string;
     quantity: number; // in Quintals
-    marketName: string;
-    location: {
-        lat: number;
-        lon: number;
-        name: string; // Reverse geocoded or selected district
-    };
-    weatherSummary: string; // Snapshot of weather at submission
+    expectedPrice?: number;
+    marketName?: string;
+    market?: string;
+    location?: {
+        lat?: number;
+        lon?: number;
+        name?: string; // Reverse geocoded or selected district
+    } | string;
+    weatherSummary?: string; // Snapshot of weather at submission
     imageUrl?: string;
-    aiEstimatedPrice: {
+    aiEstimatedPrice?: {
         min: number;
         max: number;
     };

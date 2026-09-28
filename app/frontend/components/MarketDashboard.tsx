@@ -198,7 +198,7 @@ const MarketDashboard: React.FC<MarketDashboardProps> = ({ user, onLogout, onNav
                                                 <h2 className="text-2xl font-bold text-white">{selectedRequest.cropName} <span className="text-lg font-normal text-gray-400">({selectedRequest.category})</span></h2>
                                                 <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
                                                     <span className="flex items-center gap-1"><UserCircleIcon className="w-4 h-4" /> {selectedRequest.farmerName}</span>
-                                                    <span className="flex items-center gap-1"><MapPinIcon className="w-4 h-4" /> {selectedRequest.location.name}</span>
+                                                    <span className="flex items-center gap-1"><MapPinIcon className="w-4 h-4" /> {typeof selectedRequest.location === 'object' ? selectedRequest.location?.name : (selectedRequest.location || 'Karnataka')}</span>
                                                 </div>
                                             </div>
                                             {selectedRequest.status === 'PENDING' && (
